@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lost QR</title>
+<style>
+  :root{color-scheme:light}
+  *{box-sizing:border-box}
+  body{margin:0;background:#fff;color:#111;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45;padding:20px 16px}
+  main{max-width:480px;margin:0 auto}
+  .logo{display:block;width:200px;max-width:70%;height:auto;margin:0 0 20px}
+  h1{margin:0 0 16px;font-size:20px}
+  label{display:block;font-weight:600;font-size:14px;margin:14px 0 5px}
+  input[type=text],input[type=email],input[type=password]{width:100%;min-height:46px;padding:10px 12px;font:inherit;font-size:16px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#111}
+  input:focus,button:focus-visible{outline:2px solid #0a2855;outline-offset:1px}
+  button{min-height:44px;padding:10px 16px;font:inherit;font-weight:600;border:0;border-radius:6px;background:#0a2855;color:#fff;cursor:pointer}
+  button:disabled{opacity:.5}
+  button.ghost{background:#eee;color:#111}
+  .full{width:100%;margin-top:20px}
+  .msg{min-height:1.4em;font-size:14px;margin-top:10px}
+  .bad{color:#b00020}.ok{color:#1b6b3a}
+  .hide{display:none}
+  .final{font-size:22px;line-height:1.4;margin:40px 0 24px;text-align:center}
+  .final strong{color:#d00000;font-weight:800}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .bar p{margin:0;color:#666;font-size:14px}
+  .tabs{display:flex;gap:8px;margin:0 0 8px}.tabs button{flex:1}
+  .item{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #ddd}
+  .item input[type=checkbox]{width:24px;height:24px;margin-top:2px;flex:none;accent-color:#0a2855}
+  .body{flex:1;min-width:0}
+  .nm{font-weight:700;word-break:break-word}
+  .meta{font-size:14px;color:#666;word-break:break-word}
+  .flag{font-size:13px;font-weight:600;color:#b00020}
+  .item.done .nm,.item.done .meta{text-decoration:line-through;opacity:.5}
+  .del{background:none;color:#666;font-weight:400;font-size:13px;min-height:36px;padding:4px 6px}
+  .empty{color:#666;text-align:center;padding:18px 0}
+  .hh{display:flex;justify-content:space-between;gap:10px}
+  .log{margin:4px 0 0;padding:0;list-style:none;font-size:13px;color:#666}
+</style>
+</head>
+<body>
+<main>
+  <img id="logo" class="logo" alt="ASTIG" src="logo.png" onerror="this.style.display='none'">
+
+  <section id="formView">
+    <h1>Lost QR</h1>
+    <label for="sName">Name of student</label>
+    <input id="sName" type="text" maxlength="100" autocomplete="off" placeholder="Jesse Harris Almacin">
+    <label for="section">Section</label>
+    <input id="section" type="text" maxlength="30" autocomplete="off" placeholder="7-A">
+    <label for="reason">Why was it lost?</label>
+    <input id="reason" type="text" maxlength="100" list="reasons" autocomplete="off" placeholder="Lost ID">
+    <datalist id="reasons"><option value="Lost ID"><option value="Lost QR"><option value="Damaged ID"><option value="QR not scanning"></datalist>
+    <button id="send" class="full" type="button">Send</button>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+  </section>
+
+  <section id="doneView" class="hide">
+    <p class="final">Kuhaa ra sa SSLG office, <strong>AYAW NA WAD-A PLEASE</strong></p>
+    <button id="again" class="ghost full" type="button">Send another</button>
+  </section>
+
+  <section id="adminView" class="hide">
+    <div id="loginView" class="hide">
+      <h1>Admin sign in</h1>
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username">
+      <label for="pw">Password</label>
+      <input id="pw" type="password" autocomplete="current-password">
+      <button id="login" class="full" type="button">Sign in</button>
+      <div class="msg" id="lMsg" role="status" aria-live="polite"></div>
+    </div>
+
+    <div id="listView" class="hide">
+      <div class="bar">
+        <div><h1 style="margin:0">Requests</h1><p><span id="nWait">0</span> waiting</p></div>
+        <div><button id="copy" type="button">Copy waiting</button> <button id="out" class="del" type="button">Sign out</button></div>
+      </div>
+      <div class="msg" id="aMsg" role="status" aria-live="polite" style="margin:0 0 8px"></div>
+      <div class="tabs">
+        <button id="tWait" type="button">Waiting</button>
+        <button id="tHist" type="button" class="ghost">History</button>
+      </div>
+      <div id="waitView"><div id="rows"></div><p class="empty" id="empty">No requests yet.</p></div>
+      <div id="histView" class="hide"><div id="hist"></div><p class="empty" id="histEmpty">No history yet.</p></div>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore,collection,addDoc,onSnapshot,doc,updateDoc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const app=initializeApp({
+  apiKey:"AIzaSyBiocwydzYmFKteLjKHoQaDYEAEI557dhQ",
+  authDomain:"astig-qr.firebaseapp.com",
+  projectId:"astig-qr",
+  storageBucket:"astig-qr.firebasestorage.app",
+  messagingSenderId:"671736982428",
+  appId:"1:671736982428:web:b7f8ec12bb51c5044af659"
+});
+const db=getFirestore(app),auth=getAuth(app),COL="requests";
+
+const $=id=>document.getElementById(id);
+const show=(id,on)=>$(id).classList.toggle("hide",!on);
+const say=(id,t,c)=>{const m=$(id);m.textContent=t;m.className="msg "+(c||"");};
+const clean=v=>String(v||"").replace(/\s+/g," ").trim();
+const when=ts=>{try{return new Date(ts).toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"});}catch(e){return "";}};
+let all=[],unsub=null,tab="wait",sending=false,sent=false,user=null;
+
+/* ---------- routing: normal link = form, link#list = admin ---------- */
+function route(){
+  const admin=location.hash==="#list";
+  show("formView",!admin&&!sent);show("doneView",!admin&&sent);
+  show("adminView",admin);
+  $("logo").classList.toggle("hide",!admin&&sent);
+  if(admin){show("loginView",!user);show("listView",!!user);if(user)startList();}
+}
+window.addEventListener("hashchange",route);
+onAuthStateChanged(auth,u=>{
+  user=u;
+  if(!u&&unsub){unsub();unsub=null;all=[];}
+  route();
+});
+
+/* ---------- form for everyone ---------- */
+async function send(){
+  if(sending)return;
+  const name=clean($("sName").value),section=clean($("section").value),reason=clean($("reason").value);
+  if(!name)return say("msg","Enter the name of the student.","bad");
+  if(!section)return say("msg","Enter the section.","bad");
+  if(!reason)return say("msg","Enter why it was lost.","bad");
+  sending=true;$("send").disabled=true;say("msg","Sending…","");
+  try{
+    const wait=new Promise((_,no)=>setTimeout(no,15000));
+    await Promise.race([addDoc(collection(db,COL),{name,section,reason,ts:Date.now(),done:false}),wait]);
+    ["sName","section","reason"].forEach(i=>$(i).value="");
+    say("msg","","");sent=true;route();
+  }catch(e){say("msg","Couldn’t send. Check your connection and try again.","bad");}
+  sending=false;$("send").disabled=false;
+}
+$("send").onclick=send;
+$("again").onclick=()=>{sent=false;route();};
+
+/* ---------- admin sign in ---------- */
+function login(){
+  const email=clean($("email").value),pw=$("pw").value;
+  if(!email||!pw)return say("lMsg","Enter your email and password.","bad");
+  say("lMsg","Signing in…","");
+  signInWithEmailAndPassword(auth,email,pw).then(()=>say("lMsg","","")).catch(()=>say("lMsg","Wrong email or password.","bad"));
+}
+$("login").onclick=login;
+$("out").onclick=()=>signOut(auth);
+
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Enter"||e.target.tagName!=="INPUT"||e.target.type==="checkbox")return;
+  if(!$("formView").classList.contains("hide"))send();
+  else if(!$("loginView").classList.contains("hide"))login();
+});
+
+/* ---------- admin list ---------- */
+function startList(){
+  if(unsub)return;
+  unsub=onSnapshot(collection(db,COL),snap=>{
+    all=snap.docs.map(d=>({...d.data(),_id:d.id}));
+    all.sort((a,b)=>(a.ts||0)-(b.ts||0));
+    say("aMsg","","");render();
+  },()=>say("aMsg","Couldn’t load requests. Sign in with the admin email, then reload.","bad"));
+}
+$("tWait").onclick=()=>{tab="wait";render();};
+$("tHist").onclick=()=>{tab="hist";render();};
+$("copy").onclick=copyWaiting;
+
+/* Same student = same words in the name, ignoring case, accents, punctuation, spacing and word order. */
+const keyOf=e=>String(e.name||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(Boolean).sort().join(" ");
+function line(cls,text){const d=document.createElement("div");d.className=cls;d.textContent=text;return d;}
+
+function render(){
+  $("tWait").className=tab==="wait"?"":"ghost";$("tHist").className=tab==="hist"?"":"ghost";
+  show("waitView",tab==="wait");show("histView",tab==="hist");
+  const counts={};
+  all.forEach(e=>{const k=keyOf(e);counts[k]=(counts[k]||0)+1;e._n=counts[k];});
+  renderWaiting(counts);renderHistory();
+}
+
+function renderWaiting(counts){
+  const body=$("rows");body.textContent="";
+  const pending=all.filter(e=>!e.done),done=all.filter(e=>e.done).reverse();
+  pending.concat(done).forEach(e=>{
+    const row=document.createElement("div");row.className="item"+(e.done?" done":"");
+    const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!e.done;cb.setAttribute("aria-label","Done: "+e.name);
+    cb.onchange=()=>{
+      cb.disabled=true;
+      updateDoc(doc(db,COL,e._id),{done:cb.checked})
+        .catch(()=>{say("aMsg","Couldn’t save. Try again.","bad");cb.checked=!cb.checked;})
+        .then(()=>{cb.disabled=false;});
+    };
+    const b=document.createElement("div");b.className="body";
+    b.appendChild(line("nm",e.name||""));
+    b.appendChild(line("meta",[e.section,e.reason,when(e.ts)].filter(Boolean).join(" · ")));
+    const c=counts[keyOf(e)];
+    if(c>1)b.appendChild(line("flag","Repeat: request #"+e._n+" of "+c+" for this student"));
+    const x=document.createElement("button");x.type="button";x.className="del";x.textContent="Delete";
+    x.onclick=()=>{if(confirm("Delete this request for "+e.name+"? It will also be removed from the history."))
+      deleteDoc(doc(db,COL,e._id)).catch(()=>say("aMsg","Couldn’t delete. Try again.","bad"));};
+    row.appendChild(cb);row.appendChild(b);row.appendChild(x);body.appendChild(row);
+  });
+  $("empty").classList.toggle("hide",all.length>0);
+  $("nWait").textContent=pending.length;
+}
+
+function renderHistory(){
+  const box=$("hist");box.textContent="";
+  const g={},order=[];
+  all.forEach(e=>{const k=keyOf(e);if(!g[k]){g[k]=[];order.push(k);}g[k].push(e);});
+  order.sort((a,b)=>{const d=g[b].length-g[a].length;return d||g[b][g[b].length-1].ts-g[a][g[a].length-1].ts;});
+  order.forEach(k=>{
+    const list=g[k],last=list[list.length-1];
+    const item=document.createElement("div");item.className="item";item.style.display="block";
+    const h=document.createElement("div");h.className="hh";
+    h.appendChild(line("nm",last.name||""));
+    const t=line("nm",list.length+(list.length===1?" time":" times"));
+    if(list.length>1)t.style.color="#b00020";
+    h.appendChild(t);item.appendChild(h);
+    item.appendChild(line("meta",last.section||""));
+    const ul=document.createElement("ul");ul.className="log";
+    list.slice().reverse().forEach(e=>{
+      const li=document.createElement("li");
+      li.textContent=["#"+e._n,when(e.ts),e.section||"",e.reason||"",e.done?"QR made":"waiting"].filter(Boolean).join(" · ");
+      ul.appendChild(li);
+    });
+    item.appendChild(ul);box.appendChild(item);
+  });
+  $("histEmpty").classList.toggle("hide",all.length>0);
+}
+
+function copyWaiting(){
+  const seen={};
+  const list=all.filter(e=>{const k=keyOf(e);if(e.done||seen[k])return false;seen[k]=true;return true;});
+  if(!list.length)return say("aMsg","Nothing waiting.","bad");
+  const text=["Name of student\tSection\tReason"].concat(list.map(e=>[e.name,e.section||"",e.reason||""].join("\t"))).join("\n");
+  const ok=()=>say("aMsg","Copied "+list.length+".","ok");
+  const fb=()=>{const t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();let r=false;try{r=document.execCommand("copy");}catch(e){}document.body.removeChild(t);r?ok():say("aMsg","Copy failed. Try again.","bad");};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,fb);else fb();
+}
+
+route();
+</script>
+</body>
+</html>
