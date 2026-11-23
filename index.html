@@ -11,9 +11,10 @@
   main{max-width:480px;margin:0 auto}
   .logo{display:block;width:200px;max-width:70%;height:auto;margin:0 0 20px}
   h1{margin:0 0 16px;font-size:20px}
+  h2{margin:22px 0 6px;font-size:16px;color:#0a2855}
   label{display:block;font-weight:600;font-size:14px;margin:14px 0 5px}
-  input[type=text],input[type=email],input[type=password]{width:100%;min-height:46px;padding:10px 12px;font:inherit;font-size:16px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#111}
-  input:focus,button:focus-visible{outline:2px solid #0a2855;outline-offset:1px}
+  input[type=text],input[type=email],input[type=password],select{width:100%;min-height:46px;padding:10px 12px;font:inherit;font-size:16px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#111}
+  input:focus,select:focus,button:focus-visible,summary:focus-visible{outline:2px solid #0a2855;outline-offset:1px}
   button{min-height:44px;padding:10px 16px;font:inherit;font-weight:600;border:0;border-radius:6px;background:#0a2855;color:#fff;cursor:pointer}
   button:disabled{opacity:.5}
   button.ghost{background:#eee;color:#111}
@@ -25,7 +26,7 @@
   .final strong{color:#d00000;font-weight:800}
   .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
   .bar p{margin:0;color:#666;font-size:14px}
-  .tabs{display:flex;gap:8px;margin:0 0 8px}.tabs button{flex:1}
+  .tabs{display:flex;gap:8px;margin:0 0 8px}.tabs button{flex:1;padding:10px 6px}
   .item{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #ddd}
   .item input[type=checkbox]{width:24px;height:24px;margin-top:2px;flex:none;accent-color:#0a2855}
   .body{flex:1;min-width:0}
@@ -34,9 +35,19 @@
   .flag{font-size:13px;font-weight:600;color:#b00020}
   .item.done .nm,.item.done .meta{text-decoration:line-through;opacity:.5}
   .del{background:none;color:#666;font-weight:400;font-size:13px;min-height:36px;padding:4px 6px}
+  .acts{display:flex;flex-direction:column;align-items:flex-end;flex:none}
+  .acts .edit{color:#0a2855;font-weight:600}
   .empty{color:#666;text-align:center;padding:18px 0}
   .hh{display:flex;justify-content:space-between;gap:10px}
   .log{margin:4px 0 0;padding:0;list-style:none;font-size:13px;color:#666}
+  .editor{flex:1;min-width:0}
+  .editor label{margin:8px 0 3px;font-size:13px}
+  .editor .row{display:flex;gap:8px;margin-top:12px}.editor .row button{flex:1}
+  details{border-bottom:1px solid #ddd}
+  summary{padding:12px 0;cursor:pointer;font-weight:700;display:flex;justify-content:space-between;gap:10px;list-style:none}
+  summary::-webkit-details-marker{display:none}
+  summary span{font-weight:400;font-size:14px;color:#666}
+  .stu{padding:6px 0 10px 12px;border-top:1px dashed #e3e3e3}
 </style>
 </head>
 <body>
@@ -48,7 +59,7 @@
     <label for="sName">Name of student</label>
     <input id="sName" type="text" maxlength="100" autocomplete="off" placeholder="Jesse Harris Almacin">
     <label for="section">Section</label>
-    <input id="section" type="text" maxlength="30" autocomplete="off" placeholder="7-A">
+    <select id="section"></select>
     <label for="reason">Why was it lost?</label>
     <input id="reason" type="text" maxlength="100" list="reasons" autocomplete="off" placeholder="Lost ID">
     <datalist id="reasons"><option value="Lost ID"><option value="Lost QR"><option value="Damaged ID"><option value="QR not scanning"></datalist>
@@ -81,9 +92,11 @@
       <div class="tabs">
         <button id="tWait" type="button">Waiting</button>
         <button id="tHist" type="button" class="ghost">History</button>
+        <button id="tSec" type="button" class="ghost">Sections</button>
       </div>
       <div id="waitView"><div id="rows"></div><p class="empty" id="empty">No requests yet.</p></div>
       <div id="histView" class="hide"><div id="hist"></div><p class="empty" id="histEmpty">No history yet.</p></div>
+      <div id="secView" class="hide"><div id="secs"></div><p class="empty" id="secEmpty">No requests yet.</p></div>
     </div>
   </section>
 </main>
@@ -103,12 +116,46 @@ const app=initializeApp({
 });
 const db=getFirestore(app),auth=getAuth(app),COL="requests";
 
+/* ---------- sections by grade level ---------- */
+const L=(g,arr)=>arr.map(x=>g+"-"+x);
+const GRADES=[
+  ["Grade 7", L(7,["A","B","C","D","E","F"])],
+  ["Grade 8", L(8,["A","B","C","D","E","F"])],
+  ["Grade 9", L(9,["A","B","C","D","E"])],
+  ["Grade 10",L(10,["A","B","C","D","E"])],
+  ["Grade 11",L(11,["Amaranth","Burgundy","Cerulean","Driftwood","Ebony","Fuchsia","Garnet","Honeydew"])],
+  ["Grade 12",L(12,["Amethyst","Bloodstone","Emerald","Epidote","Euclase","Fedorite","Obsidian","Sapphire"])]
+];
+const ALLSEC=GRADES.flatMap(g=>g[1]);
+const secKey=s=>String(s||"").toLowerCase().replace(/\s+/g,"");
+/* turns whatever was stored (e.g. "7a", "7-a ") into the official section name when possible */
+const canon=s=>{const k=secKey(s);return ALLSEC.find(x=>secKey(x)===k)||ALLSEC.find(x=>secKey(x)===k.replace(/^(\d+)(?!-)/,"$1-"))||clean(s);};
+
+function fillSelect(sel,value,placeholder){
+  sel.textContent="";
+  const p=document.createElement("option");p.value="";p.textContent=placeholder||"Select section";p.disabled=true;
+  sel.appendChild(p);
+  GRADES.forEach(([g,list])=>{
+    const og=document.createElement("optgroup");og.label=g;
+    list.forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;og.appendChild(o);});
+    sel.appendChild(og);
+  });
+  const c=value?canon(value):"";
+  if(c&&!ALLSEC.includes(c)){
+    const og=document.createElement("optgroup");og.label="Other";
+    const o=document.createElement("option");o.value=c;o.textContent=c;og.appendChild(o);sel.appendChild(og);
+  }
+  sel.value=c||"";
+}
+
 const $=id=>document.getElementById(id);
 const show=(id,on)=>$(id).classList.toggle("hide",!on);
 const say=(id,t,c)=>{const m=$(id);m.textContent=t;m.className="msg "+(c||"");};
-const clean=v=>String(v||"").replace(/\s+/g," ").trim();
+function clean(v){return String(v||"").replace(/\s+/g," ").trim();}
 const when=ts=>{try{return new Date(ts).toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"});}catch(e){return "";}};
-let all=[],unsub=null,tab="wait",sending=false,sent=false,user=null;
+let all=[],unsub=null,tab="wait",sending=false,sent=false,user=null,editId=null,draft={};
+
+fillSelect($("section"),"");
 
 /* ---------- routing: normal link = form, link#list = admin ---------- */
 function route(){
@@ -128,15 +175,15 @@ onAuthStateChanged(auth,u=>{
 /* ---------- form for everyone ---------- */
 async function send(){
   if(sending)return;
-  const name=clean($("sName").value),section=clean($("section").value),reason=clean($("reason").value);
+  const name=clean($("sName").value),section=$("section").value,reason=clean($("reason").value);
   if(!name)return say("msg","Enter the name of the student.","bad");
-  if(!section)return say("msg","Enter the section.","bad");
+  if(!section)return say("msg","Select the section.","bad");
   if(!reason)return say("msg","Enter why it was lost.","bad");
   sending=true;$("send").disabled=true;say("msg","Sending…","");
   try{
     const wait=new Promise((_,no)=>setTimeout(no,15000));
     await Promise.race([addDoc(collection(db,COL),{name,section,reason,ts:Date.now(),done:false}),wait]);
-    ["sName","section","reason"].forEach(i=>$(i).value="");
+    $("sName").value="";$("section").value="";$("reason").value="";
     say("msg","","");sent=true;route();
   }catch(e){say("msg","Couldn’t send. Check your connection and try again.","bad");}
   sending=false;$("send").disabled=false;
@@ -160,6 +207,57 @@ document.addEventListener("keydown",e=>{
   else if(!$("loginView").classList.contains("hide"))login();
 });
 
+/* ---------- smarter "same student" detection ----------
+   Ignores case, accents, punctuation, spacing, word order, tiny typos (1 letter off),
+   initials ("J." matches "Jesse"), and missing middle names
+   ("Almacin Jesse" = "Jesse Harris Almacin" when both are in the same section). */
+function toks(s){
+  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(Boolean);
+}
+function lev(a,b){
+  if(Math.abs(a.length-b.length)>1)return 2;
+  const m=a.length,n=b.length,d=[];
+  for(let i=0;i<=m;i++){d[i]=[i];}
+  for(let j=1;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return d[m][n];
+}
+function tokEq(a,b){
+  if(a===b)return true;
+  if(a.length===1&&b[0]===a)return true;
+  if(b.length===1&&a[0]===b)return true;
+  return a.length>=4&&b.length>=4&&lev(a,b)<=1;
+}
+function covers(big,small){
+  const used=new Set();
+  return small.every(t=>{
+    const i=big.findIndex((b,k)=>!used.has(k)&&tokEq(t,b));
+    if(i<0)return false;used.add(i);return true;
+  });
+}
+function sameStudent(e,r){
+  const a=e._t,b=r._t;
+  if(!a.length||!b.length)return false;
+  if(a.length===b.length)return covers(b,a)&&covers(a,b);
+  const small=a.length<b.length?a:b,big=a.length<b.length?b:a;
+  return small.length>=2&&canon(e.section)===canon(r.section)&&covers(big,small);
+}
+/* groups every request into students; the longest name becomes the group's name */
+function cluster(){
+  all.forEach(e=>{e._t=toks(e.name);});
+  const order=all.slice().sort((x,y)=>y._t.length-x._t.length||(x.ts||0)-(y.ts||0));
+  const groups=[];
+  order.forEach(e=>{
+    let g=groups.find(g=>sameStudent(e,g.rep));
+    if(!g){g={rep:e,name:e.name||"",items:[]};groups.push(g);}
+    g.items.push(e);e._g=g;
+  });
+  groups.forEach(g=>{g.items.sort((a,b)=>(a.ts||0)-(b.ts||0));g.items.forEach((e,i)=>{e._n=i+1;});});
+  return groups;
+}
+
 /* ---------- admin list ---------- */
 function startList(){
   if(unsub)return;
@@ -169,27 +267,51 @@ function startList(){
     say("aMsg","","");render();
   },()=>say("aMsg","Couldn’t load requests. Sign in with the admin email, then reload.","bad"));
 }
-$("tWait").onclick=()=>{tab="wait";render();};
-$("tHist").onclick=()=>{tab="hist";render();};
+const setTab=t=>()=>{tab=t;render();};
+$("tWait").onclick=setTab("wait");$("tHist").onclick=setTab("hist");$("tSec").onclick=setTab("sec");
 $("copy").onclick=copyWaiting;
 
-/* Same student = same words in the name, ignoring case, accents, punctuation, spacing and word order. */
-const keyOf=e=>String(e.name||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(Boolean).sort().join(" ");
 function line(cls,text){const d=document.createElement("div");d.className=cls;d.textContent=text;return d;}
 
 function render(){
-  $("tWait").className=tab==="wait"?"":"ghost";$("tHist").className=tab==="hist"?"":"ghost";
-  show("waitView",tab==="wait");show("histView",tab==="hist");
-  const counts={};
-  all.forEach(e=>{const k=keyOf(e);counts[k]=(counts[k]||0)+1;e._n=counts[k];});
-  renderWaiting(counts);renderHistory();
+  [["tWait","wait"],["tHist","hist"],["tSec","sec"]].forEach(([b,t])=>{$(b).className=tab===t?"":"ghost";});
+  show("waitView",tab==="wait");show("histView",tab==="hist");show("secView",tab==="sec");
+  const groups=cluster();
+  renderWaiting();renderHistory(groups);renderSections(groups);
 }
 
-function renderWaiting(counts){
+function makeEditor(e){
+  if(!draft.id||draft.id!==e._id)draft={id:e._id,name:e.name||"",section:canon(e.section),reason:e.reason||""};
+  const wrap=document.createElement("div");wrap.className="editor";
+  const mk=(lab,input)=>{const l=document.createElement("label");l.textContent=lab;wrap.appendChild(l);wrap.appendChild(input);};
+  const n=document.createElement("input");n.type="text";n.maxLength=100;n.value=draft.name;n.oninput=()=>{draft.name=n.value;};
+  const s=document.createElement("select");fillSelect(s,draft.section);s.onchange=()=>{draft.section=s.value;};
+  const r=document.createElement("input");r.type="text";r.maxLength=100;r.value=draft.reason;r.oninput=()=>{draft.reason=r.value;};
+  mk("Name of student",n);mk("Section",s);mk("Why was it lost?",r);
+  const row=document.createElement("div");row.className="row";
+  const save=document.createElement("button");save.type="button";save.textContent="Save";
+  const cancel=document.createElement("button");cancel.type="button";cancel.className="ghost";cancel.textContent="Cancel";
+  save.onclick=()=>{
+    const name=clean(draft.name),section=draft.section,reason=clean(draft.reason);
+    if(!name||!section||!reason)return say("aMsg","Name, section and reason can’t be empty.","bad");
+    save.disabled=true;
+    updateDoc(doc(db,COL,e._id),{name,section,reason})
+      .then(()=>{editId=null;draft={};say("aMsg","Saved.","ok");render();})
+      .catch(()=>{save.disabled=false;say("aMsg","Couldn’t save. Try again.","bad");});
+  };
+  cancel.onclick=()=>{editId=null;draft={};say("aMsg","","");render();};
+  row.appendChild(save);row.appendChild(cancel);wrap.appendChild(row);
+  return wrap;
+}
+
+function renderWaiting(){
   const body=$("rows");body.textContent="";
   const pending=all.filter(e=>!e.done),done=all.filter(e=>e.done).reverse();
   pending.concat(done).forEach(e=>{
     const row=document.createElement("div");row.className="item"+(e.done?" done":"");
+    if(e._id===editId){
+      row.appendChild(makeEditor(e));body.appendChild(row);return;
+    }
     const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!e.done;cb.setAttribute("aria-label","Done: "+e.name);
     cb.onchange=()=>{
       cb.disabled=true;
@@ -199,36 +321,45 @@ function renderWaiting(counts){
     };
     const b=document.createElement("div");b.className="body";
     b.appendChild(line("nm",e.name||""));
-    b.appendChild(line("meta",[e.section,e.reason,when(e.ts)].filter(Boolean).join(" · ")));
-    const c=counts[keyOf(e)];
-    if(c>1)b.appendChild(line("flag","Repeat: request #"+e._n+" of "+c+" for this student"));
+    b.appendChild(line("meta",[canon(e.section),e.reason,when(e.ts)].filter(Boolean).join(" · ")));
+    const g=e._g,c=g.items.length;
+    if(c>1){
+      let t="Repeat: request #"+e._n+" of "+c+" for this student";
+      if(clean(g.name).toLowerCase()!==clean(e.name).toLowerCase())t+=" (matches “"+g.name+"”)";
+      b.appendChild(line("flag",t));
+    }
+    const acts=document.createElement("div");acts.className="acts";
+    const ed=document.createElement("button");ed.type="button";ed.className="del edit";ed.textContent="Edit";
+    ed.onclick=()=>{editId=e._id;draft={};say("aMsg","","");render();};
     const x=document.createElement("button");x.type="button";x.className="del";x.textContent="Delete";
     x.onclick=()=>{if(confirm("Delete this request for "+e.name+"? It will also be removed from the history."))
       deleteDoc(doc(db,COL,e._id)).catch(()=>say("aMsg","Couldn’t delete. Try again.","bad"));};
-    row.appendChild(cb);row.appendChild(b);row.appendChild(x);body.appendChild(row);
+    acts.appendChild(ed);acts.appendChild(x);
+    row.appendChild(cb);row.appendChild(b);row.appendChild(acts);body.appendChild(row);
   });
   $("empty").classList.toggle("hide",all.length>0);
   $("nWait").textContent=pending.length;
 }
 
-function renderHistory(){
+function renderHistory(groups){
   const box=$("hist");box.textContent="";
-  const g={},order=[];
-  all.forEach(e=>{const k=keyOf(e);if(!g[k]){g[k]=[];order.push(k);}g[k].push(e);});
-  order.sort((a,b)=>{const d=g[b].length-g[a].length;return d||g[b][g[b].length-1].ts-g[a][g[a].length-1].ts;});
-  order.forEach(k=>{
-    const list=g[k],last=list[list.length-1];
+  const order=groups.slice().sort((a,b)=>{
+    const d=b.items.length-a.items.length;
+    return d||b.items[b.items.length-1].ts-a.items[a.items.length-1].ts;
+  });
+  order.forEach(g=>{
+    const list=g.items,last=list[list.length-1];
     const item=document.createElement("div");item.className="item";item.style.display="block";
     const h=document.createElement("div");h.className="hh";
-    h.appendChild(line("nm",last.name||""));
+    h.appendChild(line("nm",g.name));
     const t=line("nm",list.length+(list.length===1?" time":" times"));
     if(list.length>1)t.style.color="#b00020";
     h.appendChild(t);item.appendChild(h);
-    item.appendChild(line("meta",last.section||""));
+    item.appendChild(line("meta",canon(last.section)||""));
     const ul=document.createElement("ul");ul.className="log";
     list.slice().reverse().forEach(e=>{
       const li=document.createElement("li");
-      li.textContent=["#"+e._n,when(e.ts),e.section||"",e.reason||"",e.done?"QR made":"waiting"].filter(Boolean).join(" · ");
+      li.textContent=["#"+e._n,when(e.ts),canon(e.section),e.reason||"",e.name&&clean(e.name)!==clean(g.name)?"typed: "+e.name:"",e.done?"QR made":"waiting"].filter(Boolean).join(" · ");
       ul.appendChild(li);
     });
     item.appendChild(ul);box.appendChild(item);
@@ -236,11 +367,56 @@ function renderHistory(){
   $("histEmpty").classList.toggle("hide",all.length>0);
 }
 
+/* Sections tab: students stored per section, divided by grade level */
+function renderSections(groups){
+  const box=$("secs");box.textContent="";
+  const known=new Set(ALLSEC);
+  const extras=[...new Set(all.map(e=>canon(e.section)).filter(s=>s&&!known.has(s)))].sort();
+  const blocks=GRADES.map(([g,list])=>[g,list]);
+  if(extras.length)blocks.push(["Other / unlisted",extras]);
+  blocks.forEach(([gname,list])=>{
+    const inSec=s=>all.filter(e=>canon(e.section)===s);
+    const used=list.filter(s=>inSec(s).length);
+    if(!used.length)return;
+    const h=document.createElement("h2");h.textContent=gname;box.appendChild(h);
+    used.forEach(s=>{
+      const entries=inSec(s);
+      const gs=[...new Set(entries.map(e=>e._g))].sort((a,b)=>a.name.localeCompare(b.name));
+      const waiting=entries.filter(e=>!e.done).length;
+      const d=document.createElement("details");
+      const sm=document.createElement("summary");
+      const l=document.createElement("div");l.textContent=s;
+      const r=document.createElement("span");
+      r.textContent=gs.length+(gs.length===1?" student":" students")+" · "+waiting+" waiting";
+      sm.appendChild(l);sm.appendChild(r);d.appendChild(sm);
+      gs.forEach(g=>{
+        const mine=entries.filter(e=>e._g===g);
+        const row=document.createElement("div");row.className="stu";
+        const top=document.createElement("div");top.className="hh";
+        top.appendChild(line("nm",g.name));
+        const t=line("nm",mine.length+(mine.length===1?" time":" times"));
+        if(mine.length>1)t.style.color="#b00020";
+        top.appendChild(t);row.appendChild(top);
+        const ul=document.createElement("ul");ul.className="log";
+        mine.slice().reverse().forEach(e=>{
+          const li=document.createElement("li");
+          li.textContent=[when(e.ts),e.reason||"",e.done?"QR made":"waiting"].filter(Boolean).join(" · ");
+          ul.appendChild(li);
+        });
+        row.appendChild(ul);d.appendChild(row);
+      });
+      box.appendChild(d);
+    });
+  });
+  $("secEmpty").classList.toggle("hide",all.length>0);
+}
+
 function copyWaiting(){
-  const seen={};
-  const list=all.filter(e=>{const k=keyOf(e);if(e.done||seen[k])return false;seen[k]=true;return true;});
+  cluster();
+  const seen=new Set();
+  const list=all.filter(e=>{if(e.done||seen.has(e._g))return false;seen.add(e._g);return true;});
   if(!list.length)return say("aMsg","Nothing waiting.","bad");
-  const text=["Name of student\tSection\tReason"].concat(list.map(e=>[e.name,e.section||"",e.reason||""].join("\t"))).join("\n");
+  const text=["Name of student\tSection\tReason"].concat(list.map(e=>[e._g.name,canon(e.section),e.reason||""].join("\t"))).join("\n");
   const ok=()=>say("aMsg","Copied "+list.length+".","ok");
   const fb=()=>{const t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();let r=false;try{r=document.execCommand("copy");}catch(e){}document.body.removeChild(t);r?ok():say("aMsg","Copy failed. Try again.","bad");};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,fb);else fb();
