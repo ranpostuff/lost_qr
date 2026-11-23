@@ -4,53 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lost QR</title>
-<style>
-  :root{color-scheme:light}
-  *{box-sizing:border-box}
-  body{margin:0;background:#fff;color:#111;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.45;padding:20px 16px}
-  main{max-width:480px;margin:0 auto}
-  .logo{display:block;width:200px;max-width:70%;height:auto;margin:0 0 20px}
-  h1{margin:0 0 16px;font-size:20px}
-  h2{margin:22px 0 6px;font-size:16px;color:#0a2855}
-  label{display:block;font-weight:600;font-size:14px;margin:14px 0 5px}
-  input[type=text],input[type=email],input[type=password],select{width:100%;min-height:46px;padding:10px 12px;font:inherit;font-size:16px;border:1px solid #bbb;border-radius:6px;background:#fff;color:#111}
-  input:focus,select:focus,button:focus-visible,summary:focus-visible{outline:2px solid #0a2855;outline-offset:1px}
-  button{min-height:44px;padding:10px 16px;font:inherit;font-weight:600;border:0;border-radius:6px;background:#0a2855;color:#fff;cursor:pointer}
-  button:disabled{opacity:.5}
-  button.ghost{background:#eee;color:#111}
-  .full{width:100%;margin-top:20px}
-  .msg{min-height:1.4em;font-size:14px;margin-top:10px}
-  .bad{color:#b00020}.ok{color:#1b6b3a}
-  .hide{display:none}
-  .final{font-size:22px;line-height:1.4;margin:40px 0 24px;text-align:center}
-  .final strong{color:#d00000;font-weight:800}
-  .bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
-  .bar p{margin:0;color:#666;font-size:14px}
-  .tabs{display:flex;gap:8px;margin:0 0 8px}.tabs button{flex:1;padding:10px 6px}
-  .item{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid #ddd}
-  .item input[type=checkbox]{width:24px;height:24px;margin-top:2px;flex:none;accent-color:#0a2855}
-  .body{flex:1;min-width:0}
-  .nm{font-weight:700;word-break:break-word}
-  .meta{font-size:14px;color:#666;word-break:break-word}
-  .flag{font-size:13px;font-weight:600;color:#b00020}
-  .item.done .nm,.item.done .meta{text-decoration:line-through;opacity:.5}
-  .del{background:none;color:#666;font-weight:400;font-size:13px;min-height:36px;padding:4px 6px}
-  .acts{display:flex;flex-direction:column;align-items:flex-end;flex:none}
-  .acts .edit{color:#0a2855;font-weight:600}
-  .empty{color:#666;text-align:center;padding:18px 0}
-  .hh{display:flex;justify-content:space-between;gap:10px}
-  .log{margin:4px 0 0;padding:0;list-style:none;font-size:13px;color:#666}
-  .editor{flex:1;min-width:0}
-  .editor label{margin:8px 0 3px;font-size:13px}
-  .editor .row{display:flex;gap:8px;margin-top:12px}.editor .row button{flex:1}
-  details{border-bottom:1px solid #ddd}
-  summary{padding:12px 0;cursor:pointer;font-weight:700;display:flex;justify-content:space-between;gap:10px;list-style:none}
-  summary::-webkit-details-marker{display:none}
-  summary span{font-weight:400;font-size:14px;color:#666}
-  .stu{padding:6px 0 10px 12px;border-top:1px dashed #e3e3e3}
-  details.grade>summary{font-size:17px;color:#0a2855}
-  details.grade>details.sec{margin-left:14px}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
@@ -60,6 +14,8 @@
     <h1>Lost QR</h1>
     <label for="sName">Name of student</label>
     <input id="sName" type="text" maxlength="100" autocomplete="off" placeholder="Jesse Harris Almacin">
+    <label for="grade">Grade level</label>
+    <select id="grade"></select>
     <label for="section">Section</label>
     <select id="section"></select>
     <label for="reason">Why was it lost?</label>
@@ -86,16 +42,19 @@
     </div>
 
     <div id="listView" class="hide">
-      <div class="bar">
-        <div><h1 style="margin:0">Requests</h1><p><span id="nWait">0</span> waiting</p></div>
-        <div><button id="copy" type="button">Copy waiting</button> <button id="out" class="del" type="button">Sign out</button></div>
+      <div class="sticky">
+        <div class="bar">
+          <div><h1>Requests</h1><p><span id="nWait">0</span> waiting</p></div>
+          <div><button id="copy" type="button">Copy waiting</button> <button id="out" class="del" type="button">Sign out</button></div>
+        </div>
+        <input id="q" class="search" type="text" autocomplete="off" placeholder="Search name, section or reason">
+        <div class="tabs">
+          <button id="tWait" type="button">Waiting</button>
+          <button id="tHist" type="button" class="ghost">History</button>
+          <button id="tSec" type="button" class="ghost">Sections</button>
+        </div>
       </div>
-      <div class="msg" id="aMsg" role="status" aria-live="polite" style="margin:0 0 8px"></div>
-      <div class="tabs">
-        <button id="tWait" type="button">Waiting</button>
-        <button id="tHist" type="button" class="ghost">History</button>
-        <button id="tSec" type="button" class="ghost">Sections</button>
-      </div>
+      <div class="msg" id="aMsg" role="status" aria-live="polite" style="margin:8px 0"></div>
       <div id="waitView"><div id="rows"></div><p class="empty" id="empty">No requests yet.</p></div>
       <div id="histView" class="hide"><div id="hist"></div><p class="empty" id="histEmpty">No history yet.</p></div>
       <div id="secView" class="hide"><div id="secs"></div><p class="empty" id="secEmpty">No requests yet.</p></div>
@@ -157,7 +116,26 @@ function clean(v){return String(v||"").replace(/\s+/g," ").trim();}
 const when=ts=>{try{return new Date(ts).toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"});}catch(e){return "";}};
 let all=[],unsub=null,tab="wait",sending=false,sent=false,user=null,editId=null,draft={};
 
-fillSelect($("section"),"");
+/* form: pick grade level first, then only that grade's sections show */
+function setupForm(){
+  const g=$("grade"),s=$("section");
+  g.textContent="";
+  const p=document.createElement("option");p.value="";p.textContent="Select grade level";p.disabled=true;g.appendChild(p);
+  GRADES.forEach(([name])=>{const o=document.createElement("option");o.value=name;o.textContent=name;g.appendChild(o);});
+  g.value="";
+  const fillSections=()=>{
+    s.textContent="";
+    const list=(GRADES.find(x=>x[0]===g.value)||[,[]])[1];
+    const ph=document.createElement("option");ph.value="";ph.disabled=true;
+    ph.textContent=g.value?"Select section":"Select grade level first";
+    s.appendChild(ph);
+    list.forEach(x=>{const o=document.createElement("option");o.value=x;o.textContent=x;s.appendChild(o);});
+    s.value="";s.disabled=!g.value;
+  };
+  g.onchange=fillSections;
+  fillSections();
+}
+setupForm();
 
 /* ---------- routing: normal link = form, link#list = admin ---------- */
 function route(){
@@ -179,13 +157,14 @@ async function send(){
   if(sending)return;
   const name=clean($("sName").value),section=$("section").value,reason=clean($("reason").value);
   if(!name)return say("msg","Enter the name of the student.","bad");
+  if(!$("grade").value)return say("msg","Select the grade level.","bad");
   if(!section)return say("msg","Select the section.","bad");
   if(!reason)return say("msg","Enter why it was lost.","bad");
   sending=true;$("send").disabled=true;say("msg","Sending…","");
   try{
     const wait=new Promise((_,no)=>setTimeout(no,15000));
     await Promise.race([addDoc(collection(db,COL),{name,section,reason,ts:Date.now(),done:false}),wait]);
-    $("sName").value="";$("section").value="";$("reason").value="";
+    $("sName").value="";$("reason").value="";$("grade").value="";$("grade").onchange();
     say("msg","","");sent=true;route();
   }catch(e){say("msg","Couldn’t send. Check your connection and try again.","bad");}
   sending=false;$("send").disabled=false;
@@ -275,10 +254,17 @@ $("copy").onclick=copyWaiting;
 
 function line(cls,text){const d=document.createElement("div");d.className=cls;d.textContent=text;return d;}
 
+let q="";
+const vis=e=>!q||[e.name,canon(e.section),e.reason,e._g&&e._g.name].join(" ").toLowerCase().includes(q);
+$("q").oninput=()=>{q=clean($("q").value).toLowerCase();render();};
 function render(){
-  [["tWait","wait"],["tHist","hist"],["tSec","sec"]].forEach(([b,t])=>{$(b).className=tab===t?"":"ghost";});
-  show("waitView",tab==="wait");show("histView",tab==="hist");show("secView",tab==="sec");
   const groups=cluster();
+  const nW=all.filter(e=>!e.done).length,nH=groups.length,nS=new Set(all.map(e=>canon(e.section))).size;
+  [["tWait","wait","Waiting",nW],["tHist","hist","History",nH],["tSec","sec","Sections",nS]].forEach(([b,t,lab,n])=>{
+    const el=$(b);el.className=tab===t?"":"ghost";el.textContent=lab+" ";
+    const c=document.createElement("span");c.className="count";c.textContent=n;el.appendChild(c);
+  });
+  show("waitView",tab==="wait");show("histView",tab==="hist");show("secView",tab==="sec");
   renderWaiting();renderHistory(groups);renderSections(groups);
 }
 
@@ -309,7 +295,8 @@ function makeEditor(e){
 function renderWaiting(){
   const body=$("rows");body.textContent="";
   const pending=all.filter(e=>!e.done),done=all.filter(e=>e.done).reverse();
-  pending.concat(done).forEach(e=>{
+  const shown=pending.concat(done).filter(e=>e._id===editId||vis(e));
+  shown.forEach(e=>{
     const row=document.createElement("div");row.className="item"+(e.done?" done":"");
     if(e._id===editId){
       row.appendChild(makeEditor(e));body.appendChild(row);return;
@@ -339,13 +326,14 @@ function renderWaiting(){
     acts.appendChild(ed);acts.appendChild(x);
     row.appendChild(cb);row.appendChild(b);row.appendChild(acts);body.appendChild(row);
   });
-  $("empty").classList.toggle("hide",all.length>0);
+  $("empty").textContent=all.length?"No matches.":"No requests yet.";
+  $("empty").classList.toggle("hide",shown.length>0);
   $("nWait").textContent=pending.length;
 }
 
 function renderHistory(groups){
   const box=$("hist");box.textContent="";
-  const order=groups.slice().sort((a,b)=>{
+  const order=groups.filter(g=>g.items.some(vis)).sort((a,b)=>{
     const d=b.items.length-a.items.length;
     return d||b.items[b.items.length-1].ts-a.items[a.items.length-1].ts;
   });
@@ -366,7 +354,8 @@ function renderHistory(groups){
     });
     item.appendChild(ul);box.appendChild(item);
   });
-  $("histEmpty").classList.toggle("hide",all.length>0);
+  $("histEmpty").textContent=all.length?"No matches.":"No history yet.";
+  $("histEmpty").classList.toggle("hide",order.length>0);
 }
 
 /* Sections tab: students stored per section, divided by grade level (tap a grade to open its sections) */
@@ -378,13 +367,13 @@ function renderSections(groups){
   const blocks=GRADES.map(([g,list])=>[g,list]);
   if(extras.length)blocks.push(["Other / unlisted",extras]);
   blocks.forEach(([gname,list])=>{
-    const inSec=s=>all.filter(e=>canon(e.section)===s);
+    const inSec=s=>all.filter(e=>canon(e.section)===s&&vis(e));
     const used=list.filter(s=>inSec(s).length);
     if(!used.length)return;
     const gEntries=all.filter(e=>list.includes(canon(e.section))||(gname==="Other / unlisted"));
     const gStu=new Set(gEntries.map(e=>e._g)).size,gWait=gEntries.filter(e=>!e.done).length;
     const gd=document.createElement("details");gd.className="grade";
-    const gk="g:"+gname;gd.open=openKeys.has(gk);
+    const gk="g:"+gname;gd.open=openKeys.has(gk)||!!q;
     gd.ontoggle=()=>{gd.open?openKeys.add(gk):openKeys.delete(gk);};
     const gs0=document.createElement("summary");
     const gl=document.createElement("div");gl.textContent=gname;
@@ -395,7 +384,7 @@ function renderSections(groups){
       const gs=[...new Set(entries.map(e=>e._g))].sort((a,b)=>a.name.localeCompare(b.name));
       const waiting=entries.filter(e=>!e.done).length;
       const d=document.createElement("details");d.className="sec";
-      const sk="s:"+s;d.open=openKeys.has(sk);
+      const sk="s:"+s;d.open=openKeys.has(sk)||!!q;
       d.ontoggle=()=>{d.open?openKeys.add(sk):openKeys.delete(sk);};
       const sm=document.createElement("summary");
       const l=document.createElement("div");l.textContent=s;
@@ -422,7 +411,8 @@ function renderSections(groups){
     });
     box.appendChild(gd);
   });
-  $("secEmpty").classList.toggle("hide",all.length>0);
+  $("secEmpty").textContent=all.length?"No matches.":"No requests yet.";
+  $("secEmpty").classList.toggle("hide",box.children.length>0);
 }
 
 function copyWaiting(){
