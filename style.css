@@ -1,0 +1,152 @@
+/* Lost QR — simple, clean styling */
+
+:root{
+  color-scheme:light;
+  --navy:#0a2855;
+  --bg:#f3f5f9;
+  --card:#fff;
+  --line:#e2e6ee;
+  --text:#14181f;
+  --muted:#667085;
+  --red:#c0182b;
+  --green:#1b7a45;
+  --amber:#e3a008;
+  --radius:12px;
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;padding:20px 16px 40px;
+  background:var(--bg);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  line-height:1.45;
+}
+main{max-width:560px;margin:0 auto}
+.hide{display:none}
+
+/* ---------- type ---------- */
+h1{margin:0 0 16px;font-size:22px;color:var(--navy)}
+label{display:block;margin:14px 0 5px;font-size:14px;font-weight:600}
+.logo{display:block;width:180px;max-width:60%;height:auto;margin:0 0 18px}
+
+/* ---------- form fields ---------- */
+input[type=text],input[type=email],input[type=password],select{
+  width:100%;min-height:46px;padding:10px 12px;
+  font:inherit;font-size:16px;color:var(--text);
+  background:#fff;border:1px solid #cfd5e0;border-radius:8px;
+}
+select:disabled{background:#f0f2f6;color:var(--muted)}
+input:focus,select:focus,button:focus-visible,summary:focus-visible{
+  outline:2px solid var(--navy);outline-offset:1px;
+}
+
+/* ---------- buttons ---------- */
+button{
+  min-height:44px;padding:10px 16px;
+  font:inherit;font-weight:600;color:#fff;
+  background:var(--navy);border:0;border-radius:8px;cursor:pointer;
+}
+button:hover{filter:brightness(1.12)}
+button:disabled{opacity:.5;cursor:default}
+button.ghost{background:#fff;color:var(--text);border:1px solid #cfd5e0}
+.full{width:100%;margin-top:20px}
+
+.del{
+  min-height:36px;padding:4px 8px;
+  font-size:13px;font-weight:500;color:var(--muted);
+  background:none;border:0;
+}
+.del:hover{color:var(--red);filter:none}
+
+/* ---------- messages ---------- */
+.msg{min-height:1.4em;margin-top:10px;font-size:14px}
+.bad{color:var(--red)}
+.ok{color:var(--green)}
+.empty{padding:20px 0;text-align:center;color:var(--muted)}
+
+/* ---------- cards: public form + sign in ---------- */
+#formView,#loginView{
+  padding:22px 18px 24px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+}
+
+/* ---------- thank-you screen ---------- */
+.final{margin:40px 0 24px;font-size:22px;line-height:1.4;text-align:center}
+.final strong{color:var(--red);font-weight:800}
+
+/* ---------- admin: sticky header ---------- */
+.sticky{
+  position:sticky;top:0;z-index:10;
+  margin:0 -16px 12px;padding:8px 16px 12px;
+  background:var(--bg);border-bottom:1px solid var(--line);
+}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.bar h1{margin:0}
+.bar p{margin:0;font-size:14px;color:var(--muted)}
+
+.search{margin:0 0 10px;border-radius:999px;padding:8px 16px}
+
+.tabs{display:flex;gap:6px}
+.tabs button{flex:1;min-height:42px;padding:8px 6px;font-size:14px;border-radius:999px}
+.tabs button.ghost{background:#fff;color:var(--text);border:1px solid #cfd5e0}
+
+.count{
+  display:inline-block;min-width:22px;margin-left:4px;padding:0 7px;
+  font-size:12px;line-height:20px;
+  border-radius:999px;background:rgba(120,130,150,.25);
+}
+
+/* ---------- admin: request cards ---------- */
+.item{
+  display:flex;gap:12px;align-items:flex-start;
+  margin:0 0 10px;padding:12px;
+  background:var(--card);border:1px solid var(--line);
+  border-left:5px solid var(--amber);border-radius:var(--radius);
+}
+.item.done{border-left-color:var(--green);background:#f6faf7}
+.item.done .nm,.item.done .meta{text-decoration:line-through;opacity:.55}
+#hist .item{border-left-color:var(--navy)}
+
+.item input[type=checkbox]{flex:none;width:24px;height:24px;margin-top:2px;accent-color:var(--navy)}
+.body{flex:1;min-width:0}
+.nm{font-weight:700;word-break:break-word}
+.meta{margin-top:2px;font-size:14px;color:var(--muted);word-break:break-word}
+.flag{margin-top:2px;font-size:13px;font-weight:600;color:var(--red)}
+
+.acts{display:flex;flex-direction:column;align-items:flex-end;flex:none}
+.acts .edit{
+  margin-bottom:4px;padding:6px 14px;min-height:38px;
+  font-weight:600;color:var(--navy);background:#eaf0fa;border-radius:8px;
+}
+
+.hh{display:flex;justify-content:space-between;gap:10px}
+.log{margin:4px 0 0;padding:0;list-style:none;font-size:13px;color:var(--muted)}
+
+/* ---------- admin: inline editor ---------- */
+.editor{flex:1;min-width:0}
+.editor label{margin:8px 0 3px;font-size:13px}
+.editor .row{display:flex;gap:8px;margin-top:14px}
+.editor .row button{flex:1}
+
+/* ---------- admin: grade / section dropdowns ---------- */
+details{
+  margin:0 0 10px;padding:0 14px;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+}
+summary{
+  display:flex;align-items:center;gap:10px;
+  min-height:48px;padding:10px 0;
+  font-weight:700;cursor:pointer;list-style:none;
+}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"▾";color:var(--muted)}
+details[open]>summary::after{content:"▴"}
+details[open]>summary{border-bottom:1px solid var(--line)}
+summary span{margin-left:auto;font-size:14px;font-weight:400;color:var(--muted)}
+
+details.grade{border-left:5px solid var(--navy)}
+details.grade>summary{font-size:17px;color:var(--navy)}
+details.grade>details.sec{margin:8px 0;background:#f8f9fc}
+
+.stu{padding:8px 0 10px 12px;border-top:1px dashed var(--line)}
