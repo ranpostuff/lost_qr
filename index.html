@@ -8,7 +8,7 @@
 </head>
 <body>
 <main>
-  <img id="logo" class="logo" alt="ASTIG" src="logo.png" onerror="this.style.display='none'">
+  <img id="logo" class="logo" alt="ASTIG" src="astig.png" onerror="this.style.display='none'">
 
   <section id="formView">
     <h1>Lost QR</h1>
@@ -52,6 +52,20 @@
           <button id="tWait" type="button">Waiting</button>
           <button id="tHist" type="button" class="ghost">History</button>
           <button id="tSec" type="button" class="ghost">Sections</button>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-ico" aria-hidden="true">&#9638;</div>
+          <div class="stat-lab">Lost QR codes</div>
+          <div class="stat-val" id="sLost">0</div>
+          <div class="stat-sub" id="sLostSub">0 made · 0 waiting</div>
+        </div>
+        <div class="stat money">
+          <div class="stat-ico" aria-hidden="true">&#8369;</div>
+          <div class="stat-lab">Revenue</div>
+          <div class="stat-val" id="sRev">&#8369;0</div>
+          <div class="stat-sub">&#8369;20 per lost QR</div>
         </div>
       </div>
       <div class="msg" id="aMsg" role="status" aria-live="polite" style="margin:8px 0"></div>
@@ -114,6 +128,7 @@ const show=(id,on)=>$(id).classList.toggle("hide",!on);
 const say=(id,t,c)=>{const m=$(id);m.textContent=t;m.className="msg "+(c||"");};
 function clean(v){return String(v||"").replace(/\s+/g," ").trim();}
 const when=ts=>{try{return new Date(ts).toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"});}catch(e){return "";}};
+const PRICE=20;
 let all=[],unsub=null,tab="wait",sending=false,sent=false,user=null,editId=null,draft={};
 
 /* form: pick grade level first, then only that grade's sections show */
@@ -264,6 +279,10 @@ function render(){
     const el=$(b);el.className=tab===t?"":"ghost";el.textContent=lab+" ";
     const c=document.createElement("span");c.className="count";c.textContent=n;el.appendChild(c);
   });
+  const lost=all.length,made=all.filter(e=>e.done).length;
+  $("sLost").textContent=lost.toLocaleString();
+  $("sLostSub").textContent=made+" made · "+(lost-made)+" waiting";
+  $("sRev").textContent="\u20B1"+(lost*PRICE).toLocaleString();
   show("waitView",tab==="wait");show("histView",tab==="hist");show("secView",tab==="sec");
   renderWaiting();renderHistory(groups);renderSections(groups);
 }
