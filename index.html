@@ -48,6 +48,8 @@
   summary::-webkit-details-marker{display:none}
   summary span{font-weight:400;font-size:14px;color:#666}
   .stu{padding:6px 0 10px 12px;border-top:1px dashed #e3e3e3}
+  details.grade>summary{font-size:17px;color:#0a2855}
+  details.grade>details.sec{margin-left:14px}
 </style>
 </head>
 <body>
@@ -367,7 +369,8 @@ function renderHistory(groups){
   $("histEmpty").classList.toggle("hide",all.length>0);
 }
 
-/* Sections tab: students stored per section, divided by grade level */
+/* Sections tab: students stored per section, divided by grade level (tap a grade to open its sections) */
+const openKeys=new Set();
 function renderSections(groups){
   const box=$("secs");box.textContent="";
   const known=new Set(ALLSEC);
@@ -378,12 +381,22 @@ function renderSections(groups){
     const inSec=s=>all.filter(e=>canon(e.section)===s);
     const used=list.filter(s=>inSec(s).length);
     if(!used.length)return;
-    const h=document.createElement("h2");h.textContent=gname;box.appendChild(h);
+    const gEntries=all.filter(e=>list.includes(canon(e.section))||(gname==="Other / unlisted"));
+    const gStu=new Set(gEntries.map(e=>e._g)).size,gWait=gEntries.filter(e=>!e.done).length;
+    const gd=document.createElement("details");gd.className="grade";
+    const gk="g:"+gname;gd.open=openKeys.has(gk);
+    gd.ontoggle=()=>{gd.open?openKeys.add(gk):openKeys.delete(gk);};
+    const gs0=document.createElement("summary");
+    const gl=document.createElement("div");gl.textContent=gname;
+    const gr=document.createElement("span");gr.textContent=gStu+(gStu===1?" student":" students")+" · "+gWait+" waiting";
+    gs0.appendChild(gl);gs0.appendChild(gr);gd.appendChild(gs0);
     used.forEach(s=>{
       const entries=inSec(s);
       const gs=[...new Set(entries.map(e=>e._g))].sort((a,b)=>a.name.localeCompare(b.name));
       const waiting=entries.filter(e=>!e.done).length;
-      const d=document.createElement("details");
+      const d=document.createElement("details");d.className="sec";
+      const sk="s:"+s;d.open=openKeys.has(sk);
+      d.ontoggle=()=>{d.open?openKeys.add(sk):openKeys.delete(sk);};
       const sm=document.createElement("summary");
       const l=document.createElement("div");l.textContent=s;
       const r=document.createElement("span");
@@ -405,8 +418,9 @@ function renderSections(groups){
         });
         row.appendChild(ul);d.appendChild(row);
       });
-      box.appendChild(d);
+      gd.appendChild(d);
     });
+    box.appendChild(gd);
   });
   $("secEmpty").classList.toggle("hide",all.length>0);
 }
