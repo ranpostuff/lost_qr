@@ -54,20 +54,7 @@
           <button id="tSec" type="button" class="ghost">Sections</button>
         </div>
       </div>
-      <div class="stats">
-        <div class="stat">
-          <div class="stat-ico" aria-hidden="true">&#9638;</div>
-          <div class="stat-lab">Lost QR codes</div>
-          <div class="stat-val" id="sLost">0</div>
-          <div class="stat-sub" id="sLostSub">0 made · 0 waiting</div>
-        </div>
-        <div class="stat money">
-          <div class="stat-ico" aria-hidden="true">&#8369;</div>
-          <div class="stat-lab">Revenue</div>
-          <div class="stat-val" id="sRev">&#8369;0</div>
-          <div class="stat-sub">&#8369;20 per lost QR</div>
-        </div>
-      </div>
+      <div class="summary"><span>Lost QR <b id="sLost">0</b></span><span class="dot">&middot;</span><span>Revenue <b id="sRev">&#8369;0</b></span></div>
       <div class="msg" id="aMsg" role="status" aria-live="polite" style="margin:8px 0"></div>
       <div id="waitView"><div id="rows"></div><p class="empty" id="empty">No requests yet.</p></div>
       <div id="histView" class="hide"><div id="hist"></div><p class="empty" id="histEmpty">No history yet.</p></div>
@@ -279,9 +266,8 @@ function render(){
     const el=$(b);el.className=tab===t?"":"ghost";el.textContent=lab+" ";
     const c=document.createElement("span");c.className="count";c.textContent=n;el.appendChild(c);
   });
-  const lost=all.length,made=all.filter(e=>e.done).length;
+  const lost=all.length;
   $("sLost").textContent=lost.toLocaleString();
-  $("sLostSub").textContent=made+" made · "+(lost-made)+" waiting";
   $("sRev").textContent="\u20B1"+(lost*PRICE).toLocaleString();
   show("waitView",tab==="wait");show("histView",tab==="hist");show("secView",tab==="sec");
   renderWaiting();renderHistory(groups);renderSections(groups);
@@ -362,7 +348,7 @@ function renderHistory(groups){
     const h=document.createElement("div");h.className="hh";
     h.appendChild(line("nm",g.name));
     const t=line("nm",list.length+(list.length===1?" time":" times"));
-    if(list.length>1)t.style.color="#b00020";
+    if(list.length>1)t.classList.add("rep");
     h.appendChild(t);item.appendChild(h);
     item.appendChild(line("meta",canon(last.section)||""));
     const ul=document.createElement("ul");ul.className="log";
@@ -379,6 +365,12 @@ function renderHistory(groups){
 
 /* Sections tab: students stored per section, divided by grade level (tap a grade to open its sections) */
 const openKeys=new Set();
+function badges(n,w){
+  const s=document.createElement("span");s.className="badges";
+  const a=document.createElement("em");a.className="b-n";a.textContent=n+(n===1?" student":" students");s.appendChild(a);
+  if(w){const b=document.createElement("em");b.className="b-w";b.textContent=w+" waiting";s.appendChild(b);}
+  return s;
+}
 function renderSections(groups){
   const box=$("secs");box.textContent="";
   const known=new Set(ALLSEC);
@@ -396,7 +388,7 @@ function renderSections(groups){
     gd.ontoggle=()=>{gd.open?openKeys.add(gk):openKeys.delete(gk);};
     const gs0=document.createElement("summary");
     const gl=document.createElement("div");gl.textContent=gname;
-    const gr=document.createElement("span");gr.textContent=gStu+(gStu===1?" student":" students")+" · "+gWait+" waiting";
+    const gr=badges(gStu,gWait);
     gs0.appendChild(gl);gs0.appendChild(gr);gd.appendChild(gs0);
     used.forEach(s=>{
       const entries=inSec(s);
@@ -407,8 +399,7 @@ function renderSections(groups){
       d.ontoggle=()=>{d.open?openKeys.add(sk):openKeys.delete(sk);};
       const sm=document.createElement("summary");
       const l=document.createElement("div");l.textContent=s;
-      const r=document.createElement("span");
-      r.textContent=gs.length+(gs.length===1?" student":" students")+" · "+waiting+" waiting";
+      const r=badges(gs.length,waiting);
       sm.appendChild(l);sm.appendChild(r);d.appendChild(sm);
       gs.forEach(g=>{
         const mine=entries.filter(e=>e._g===g);
@@ -416,7 +407,7 @@ function renderSections(groups){
         const top=document.createElement("div");top.className="hh";
         top.appendChild(line("nm",g.name));
         const t=line("nm",mine.length+(mine.length===1?" time":" times"));
-        if(mine.length>1)t.style.color="#b00020";
+        if(mine.length>1)t.classList.add("rep");
         top.appendChild(t);row.appendChild(top);
         const ul=document.createElement("ul");ul.className="log";
         mine.slice().reverse().forEach(e=>{
