@@ -122,7 +122,21 @@ function copyWaiting(){cluster();const seen=new Set();const list=all.filter(inB)
   const text=["Name of student\tSection\tReason"].concat(list.map(e=>[e._g.name,canon(e.section),e.reason||""].join("\t"))).join("\n");
   const ok=()=>say("Copied "+list.length+".");const fb=()=>{const t=el("textarea");t.value=text;document.body.appendChild(t);t.select();let r=false;try{r=document.execCommand("copy");}catch(x){}document.body.removeChild(t);r?ok():say("Copy failed. Try again.","bad");};
   if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,fb);else fb();}
-const moreMenu=()=>menu("Menu",[{label:"Copy waiting list",fn:copyWaiting},{label:"Start a new batch",fn:newBatch},batches.length?{label:"Undo latest batch",fn:undoBatch}:null,{label:"Sign out",sep:true,fn:()=>signOut(auth)}]);
+/* copy every student in the viewed batch (done or not) as a numbered list, grouped by grade level */
+function copyList(){cluster();all.forEach(e=>{e._b=batchOf(e);});const P=all.filter(inB);
+  if(!P.length)return say("Nothing in this batch.","bad");
+  const by=new Map();const seen=new Set();
+  P.forEach(e=>{if(seen.has(e._g))return;seen.add(e._g);const s=canon(e.section),g=gradeOf(s);if(!by.has(g))by.set(g,[]);by.get(g).push({name:e._g.name,s});});
+  const out=[];let total=0;
+  GRADES.map(g=>g[0]).concat("Other").filter(g=>by.has(g)).forEach(g=>{
+    const list=by.get(g).sort((a,b)=>(ALLSEC.indexOf(a.s)-ALLSEC.indexOf(b.s))||a.name.localeCompare(b.name));
+    if(out.length)out.push("");out.push(g.toUpperCase()+" ("+list.length+")");
+    list.forEach((x,i)=>out.push((i+1)+". "+x.name+" - "+x.s));total+=list.length;});
+  const text=(selN()==="all"?"ALL BATCHES":"BATCH "+selN())+" - "+total+" students\n\n"+out.join("\n");
+  const ok=()=>say("Copied "+total+" students.");
+  const fb=()=>{const t=el("textarea");t.value=text;document.body.appendChild(t);t.select();let r=false;try{r=document.execCommand("copy");}catch(x){}document.body.removeChild(t);r?ok():say("Copy failed. Try again.","bad");};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,fb);else fb();}
+const moreMenu=()=>menu("Menu",[{label:"Copy student list (this batch)",fn:copyList},{label:"Copy waiting list",fn:copyWaiting},{label:"Start a new batch",fn:newBatch},batches.length?{label:"Undo latest batch",fn:undoBatch}:null,{label:"Sign out",sep:true,fn:()=>signOut(auth)}]);
 
 /* ---------- admin render ---------- */
 function empty(text){const d=el("div","empty",null,IC.box);d.appendChild(el("p",null,text));return d;}
@@ -147,7 +161,7 @@ function renderTodo(box,P){
   if(other.length){const byB={};other.forEach(e=>{byB[e._b]=(byB[e._b]||0)+1;});const k=Object.keys(byB).sort((a,b)=>b-a)[0];
    const h=el("div","hint",plural(other.length,"request")+" still waiting in "+(Object.keys(byB).length>1?"older batches":"Batch "+k)+".");
    const v=el("button",null,"View all");v.type="button";v.onclick=()=>{bsel="all";render();};h.appendChild(v);box.appendChild(h);}
-  box.appendChild(el("div","sec-head")).append(el("h2",null,"To do · "+pending.length+" waiting"));
+  const sh=el("div","sec-head");sh.appendChild(el("h2",null,"To do · "+pending.length+" waiting"));sh.appendChild(btn("Copy list","btn--secondary",copyList));box.appendChild(sh);
   const list=el("div","stack");shown.forEach(e=>list.appendChild(requestCard(e)));box.appendChild(list);
   if(!shown.length)box.appendChild(empty(emptyMsg()));}
 const gradeOf=s=>{const g=GRADES.find(x=>x[1].includes(s));return g?g[0]:"Other";};
