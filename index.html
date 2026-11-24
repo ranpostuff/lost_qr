@@ -141,7 +141,7 @@ const moreMenu=()=>menu("Menu",[{label:"Copy student list (this batch)",fn:copyL
 /* ---------- admin render ---------- */
 function empty(text){const d=el("div","empty",null,IC.box);d.appendChild(el("p",null,text));return d;}
 const emptyMsg=()=>!all.length?"No requests yet.":(!all.filter(inB).length?"Nothing in this batch yet.":(q?"No matches for “"+q+"”.":"Nothing waiting. Nice work."));
-function requestCard(e){const card=el("div","card"+(e.done?" card--done":"")+(e._id===flashId?" card--flash":""));
+function requestCard(e){const card=el("div","card"+(e.done?" card--done":"")+(e.exempt?" card--exempt":"")+(e._id===flashId?" card--flash":""));
   const lab=el("label","check");const cb=el("input");cb.type="checkbox";cb.checked=!!e.done;cb.setAttribute("aria-label","QR made: "+e.name);cb.onchange=()=>toggleDone(e,cb);lab.appendChild(cb);
   const b=el("div","card__body");b.appendChild(el("div","card__title wrap",e.name||""));
   b.appendChild(el("div","card__meta wrap",[canon(e.section),e.reason,when(e.ts),selN()==="all"?"Batch "+e._b:"",e.exempt?"Exempt":""].filter(Boolean).join(" · ")));
@@ -165,7 +165,7 @@ function renderTodo(box,P){
   const list=el("div","stack");shown.forEach(e=>list.appendChild(requestCard(e)));box.appendChild(list);
   if(!shown.length)box.appendChild(empty(emptyMsg()));}
 const gradeOf=s=>{const g=GRADES.find(x=>x[1].includes(s));return g?g[0]:"Other";};
-function studentRow(g,es,showSec){const mine=es.filter(e=>e._g===g);const r=el("button","row");r.type="button";
+function studentRow(g,es,showSec){const mine=es.filter(e=>e._g===g);const r=el("button","row"+(mine.length&&mine.every(e=>e.exempt)?" row--exempt":""));r.type="button";
   r.appendChild(el("span","ico avatar",initials(g.name)));const b=el("span","row__body");b.appendChild(el("div","card__title wrap",g.name));
   b.appendChild(el("div","card__meta",(showSec?canon(mine[0].section)+" · ":"")+(mine.filter(e=>!e.done).length?mine.filter(e=>!e.done).length+" waiting":"All QR made")));r.appendChild(b);
   r.appendChild(pill(plural(mine.length,"loss").replace("losss","losses"),mine.length>1?"repeat":""));r.insertAdjacentHTML("beforeend",IC.chev);r.onclick=()=>{sv={...sv,lvl:"student",st:g.items[0]._id};render();window.scrollTo(0,0);};return r;}
@@ -199,7 +199,7 @@ function renderStudents(box,P,groups){
    const head=el("div","card");head.appendChild(el("span","ico avatar",initials(g.name)));const b=el("div","card__body");b.appendChild(el("div","card__title wrap",g.name));b.appendChild(el("div","card__meta",s));head.appendChild(b);
    head.appendChild(pill(mine.length+(mine.length===1?" loss":" losses"),mine.length>1?"repeat":""));wrap.appendChild(head);
    const ul=el("div","stack");ul.classList.add("sec-head");ul.classList.remove("sec-head");
-   mine.forEach(e=>{const c=el("div","card"+(e._id===flashId?" card--flash":""));const bb=el("div","card__body");bb.appendChild(el("div","card__title",e.reason||"—"));
+   mine.forEach(e=>{const c=el("div","card"+(e.exempt?" card--exempt":"")+(e._id===flashId?" card--flash":""));const bb=el("div","card__body");bb.appendChild(el("div","card__title",e.reason||"—"));
     bb.appendChild(el("div","card__meta",[when(e.ts),selN()==="all"?"Batch "+e._b:"",e.exempt?"Exempt":""].filter(Boolean).join(" · ")));c.appendChild(bb);c.appendChild(pill(e.done?"QR made":"Waiting",e.done?"outline":"strong"));
     c.appendChild(ibtn(IC.dots,"Actions for "+e.reason,()=>reqMenu(e)));ul.appendChild(c);});
    const h=el("div","sec-head");h.appendChild(el("h2",null,"Losses"));wrap.appendChild(h);wrap.appendChild(ul);}
