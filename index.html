@@ -2,82 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lost QR</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <img id="logo" class="logo" alt="ASTIG" src="astig.png" onerror="this.style.display='none'">
-
-  <section id="formView">
-    <h1>Lost QR</h1>
-    <label for="sName">Name of student</label>
-    <input id="sName" type="text" maxlength="100" autocomplete="off" placeholder="Jesse Harris Almacin">
-    <label for="grade">Grade level</label>
-    <select id="grade"></select>
-    <label for="section">Section</label>
-    <select id="section"></select>
-    <label for="reason">Why was it lost?</label>
-    <input id="reason" type="text" maxlength="100" list="reasons" autocomplete="off" placeholder="Lost ID">
-    <datalist id="reasons"><option value="Lost ID"><option value="Lost QR"><option value="Damaged ID"><option value="QR not scanning"></datalist>
-    <button id="send" class="full" type="button">Send</button>
-    <div class="msg" id="msg" role="status" aria-live="polite"></div>
-  </section>
-
-  <section id="doneView" class="hide">
-    <p class="final">Kuhaa ra sa SSLG office, <strong>AYAW NA WAD-A PLEASE</strong></p>
-    <button id="again" class="ghost full" type="button">Send another</button>
-  </section>
-
-  <section id="adminView" class="hide">
-    <div id="loginView" class="hide">
-      <h1>Admin sign in</h1>
-      <label for="email">Email</label>
-      <input id="email" type="email" autocomplete="username">
-      <label for="pw">Password</label>
-      <input id="pw" type="password" autocomplete="current-password">
-      <button id="login" class="full" type="button">Sign in</button>
-      <div class="msg" id="lMsg" role="status" aria-live="polite"></div>
-    </div>
-
-    <div id="listView" class="hide">
-      <div class="sticky">
-        <div class="bar">
-          <div><h1>Requests</h1><p><span id="nWait">0</span> waiting</p></div>
-          <div><button id="copy" type="button">Copy waiting</button> <button id="out" class="del" type="button">Sign out</button></div>
-        </div>
-        <div class="batchbar">
-          <select id="bsel" aria-label="Batch"></select>
-          <button id="newBatch" type="button">+ New batch</button>
-          <button id="undoBatch" type="button" class="ghost hide" title="Undo the latest batch" aria-label="Undo the latest batch">&#8630;</button>
-        </div>
-        <div class="msg" id="bMsg" role="status" aria-live="polite"></div>
-        <div class="tabs">
-          <button id="tWait" type="button">Waiting</button>
-          <button id="tHist" type="button" class="ghost">History</button>
-          <button id="tSec" type="button" class="ghost">Sections</button>
-        </div>
-      </div>
-      <div class="summary">
-        <span>Lost QR <b id="sLost">0</b></span><span class="dot">&middot;</span>
-        <span>Exempt <b id="sEx">0</b></span><span class="dot">&middot;</span>
-        <span>Revenue <b id="sRev">&#8369;0</b></span>
-      </div>
-      <input id="q" class="search" type="text" autocomplete="off" placeholder="Search name, section or reason">
-      <div class="msg" id="aMsg" role="status" aria-live="polite" style="margin:8px 0"></div>
-      <div id="waitView"><div id="rows"></div><p class="empty" id="empty">No requests yet.</p></div>
-      <div id="histView" class="hide"><div id="hist"></div><p class="empty" id="histEmpty">No history yet.</p></div>
-      <div id="secView" class="hide"><div id="secs"></div><p class="empty" id="secEmpty">No requests yet.</p></div>
-    </div>
-  </section>
-</main>
-
+<div id="app"></div><div id="layer"></div><div id="toastBox" role="status" aria-live="polite"></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getFirestore,collection,addDoc,onSnapshot,doc,updateDoc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+/* ===== App ===== */
 const app=initializeApp({
   apiKey:"AIzaSyBiocwydzYmFKteLjKHoQaDYEAEI557dhQ",
   authDomain:"astig-qr.firebaseapp.com",
@@ -85,495 +21,257 @@ const app=initializeApp({
   storageBucket:"astig-qr.firebasestorage.app",
   messagingSenderId:"671736982428",
   appId:"1:671736982428:web:b7f8ec12bb51c5044af659"
-});
-const db=getFirestore(app),auth=getAuth(app),COL="requests";
-
-/* ---------- sections by grade level ---------- */
+}),db=getFirestore(app),auth=getAuth(app),COL="requests",PRICE=20;
 const L=(g,arr)=>arr.map(x=>g+"-"+x);
-const GRADES=[
-  ["Grade 7", L(7,["A","B","C","D","E","F"])],
-  ["Grade 8", L(8,["A","B","C","D","E","F"])],
-  ["Grade 9", L(9,["A","B","C","D","E"])],
-  ["Grade 10",L(10,["A","B","C","D","E"])],
-  ["Grade 11",L(11,["Amaranth","Burgundy","Cerulean","Driftwood","Ebony","Fuchsia","Garnet","Honeydew"])],
-  ["Grade 12",L(12,["Amethyst","Bloodstone","Emerald","Epidote","Euclase","Fedorite","Obsidian","Sapphire"])]
-];
+const GRADES=[["Grade 7",L(7,"ABCDEF".split(""))],["Grade 8",L(8,"ABCDEF".split(""))],["Grade 9",L(9,"ABCDE".split(""))],["Grade 10",L(10,"ABCDE".split(""))],["Grade 11",L(11,["Amaranth","Burgundy","Cerulean","Driftwood","Ebony","Fuchsia","Garnet","Honeydew"])],["Grade 12",L(12,["Amethyst","Bloodstone","Emerald","Epidote","Euclase","Fedorite","Obsidian","Sapphire"])]];
 const ALLSEC=GRADES.flatMap(g=>g[1]);
 const secKey=s=>String(s||"").toLowerCase().replace(/\s+/g,"");
-/* turns whatever was stored (e.g. "7a", "7-a ") into the official section name when possible */
 const canon=s=>{const k=secKey(s);return ALLSEC.find(x=>secKey(x)===k)||ALLSEC.find(x=>secKey(x)===k.replace(/^(\d+)(?!-)/,"$1-"))||clean(s);};
+const clean=v=>String(v||"").replace(/\s+/g," ").trim();
+const when=ts=>{try{return new Date(ts).toLocaleDateString([],{month:"short",day:"numeric"});}catch(e){return "";}};
+const plural=(n,w)=>n+" "+w+(n===1?"":"s");
+const ord=n=>n===2?"2nd":n===3?"3rd":n+"th";
+const initials=n=>{const t=clean(n).split(" ").filter(Boolean);return(((t[0]||"")[0]||"")+(t.length>1?t[t.length-1][0]:"")).toUpperCase()||"?";};
+const SV=p=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
+const IC={dots:SV('<circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/>'),chev:SV('<path d="m9 6 6 6-6 6"/>'),back:SV('<path d="m15 6-6 6 6 6"/>'),down:SV('<path d="m6 9 6 6 6-6"/>'),search:SV('<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>'),x:SV('<path d="M6 6l12 12M18 6 6 18"/>'),check:SV('<path d="m5 12 5 5 9-10"/>'),grid:SV('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/>'),list:SV('<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>'),people:SV('<circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14c2.6 0 4.5 1.8 4.5 4.5"/>'),grade:SV('<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/>'),box:SV('<path d="M4 8l8-4 8 4v8l-8 4-8-4V8Z"/><path d="m4 8 8 4 8-4M12 12v8"/>')};
+function el(tag,cls,text,html){const e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;if(html)e.innerHTML=html;return e;}
+function btn(label,cls,fn){const b=el("button","btn "+(cls||""),label);b.type="button";b.onclick=fn;return b;}
+function ibtn(svg,label,fn){const b=el("button","icon-btn",null,svg);b.type="button";b.setAttribute("aria-label",label);b.onclick=fn;return b;}
+const pill=(t,c)=>el("span","pill"+(c?" pill--"+c:""),t);
 
-function fillSelect(sel,value,placeholder){
-  sel.textContent="";
-  const p=document.createElement("option");p.value="";p.textContent=placeholder||"Select section";p.disabled=true;
-  sel.appendChild(p);
-  GRADES.forEach(([g,list])=>{
-    const og=document.createElement("optgroup");og.label=g;
-    list.forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s;og.appendChild(o);});
-    sel.appendChild(og);
-  });
-  const c=value?canon(value):"";
-  if(c&&!ALLSEC.includes(c)){
-    const og=document.createElement("optgroup");og.label="Other";
-    const o=document.createElement("option");o.value=c;o.textContent=c;og.appendChild(o);sel.appendChild(og);
-  }
-  sel.value=c||"";
-}
+/* state */
+let sheetFull=false,sheets=[],sheetDraft=null,sheetN=null,sheetDirty=false,saveT=null,all=[],batches=[],bsel="latest",loaded=false,user=null,tab="todo",q="",sent=false,flashId=null;
+let sv={lvl:"grades",g:null,s:null,st:null},unsub=null,unsubB=null,searchOpen=false,toastT=null;
+/* toast */
+function say(t,kind){const box=document.getElementById("toastBox");box.textContent="";if(!t)return;const d=el("div","toast"+(kind==="bad"?" toast--bad":""),t);
+ if(kind==="bad"){const x=ibtn(IC.x,"Dismiss",()=>box.textContent="");x.classList.add("toast__x");d.appendChild(x);}
+ box.appendChild(d);clearTimeout(toastT);if(kind!=="bad")toastT=setTimeout(()=>box.textContent="",3000);}
 
-const $=id=>document.getElementById(id);
-const show=(id,on)=>$(id).classList.toggle("hide",!on);
-const say=(id,t,c)=>{const m=$(id);m.textContent=t;m.className="msg "+(c||"");};
-function clean(v){return String(v||"").replace(/\s+/g," ").trim();}
-const when=ts=>{try{return new Date(ts).toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"});}catch(e){return "";}};
-const PRICE=20;
-let all=[],unsub=null,unsubB=null,tab="wait",sending=false,sent=false,user=null,editId=null,draft={};
+/* ---------- same-student detection (unchanged logic) ---------- */
+function toks(s){return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(Boolean);}
+function lev(a,b){if(Math.abs(a.length-b.length)>1)return 2;const m=a.length,n=b.length,d=[];for(let i=0;i<=m;i++)d[i]=[i];for(let j=1;j<=n;j++)d[0][j]=j;
+ for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n];}
+function tokEq(a,b){if(a===b)return true;if(a.length===1&&b[0]===a)return true;if(b.length===1&&a[0]===b)return true;return a.length>=4&&b.length>=4&&lev(a,b)<=1;}
+function covers(big,small){const used=new Set();return small.every(t=>{const i=big.findIndex((b,k)=>!used.has(k)&&tokEq(t,b));if(i<0)return false;used.add(i);return true;});}
+function sameStudent(e,r){const a=e._t,b=r._t;if(!a.length||!b.length)return false;if(a.length===b.length)return covers(b,a)&&covers(a,b);
+ const small=a.length<b.length?a:b,big=a.length<b.length?b:a;return small.length>=2&&canon(e.section)===canon(r.section)&&covers(big,small);}
+function cluster(){all.forEach(e=>{e._t=toks(e.name);});const order=all.slice().sort((x,y)=>y._t.length-x._t.length||(x.ts||0)-(y.ts||0));const groups=[];
+ order.forEach(e=>{let g=groups.find(g=>sameStudent(e,g.rep));if(!g){g={rep:e,name:e.name||"",items:[]};groups.push(g);}g.items.push(e);e._g=g;});
+ groups.forEach(g=>{g.items.sort((a,b)=>(a.ts||0)-(b.ts||0));g.items.forEach((e,i)=>{e._n=i+1;});});return groups;}
 
-/* form: pick grade level first, then only that grade's sections show */
-function setupForm(){
-  const g=$("grade"),s=$("section");
-  g.textContent="";
-  const p=document.createElement("option");p.value="";p.textContent="Select grade level";p.disabled=true;g.appendChild(p);
-  GRADES.forEach(([name])=>{const o=document.createElement("option");o.value=name;o.textContent=name;g.appendChild(o);});
-  g.value="";
-  const fillSections=()=>{
-    s.textContent="";
-    const list=(GRADES.find(x=>x[0]===g.value)||[,[]])[1];
-    const ph=document.createElement("option");ph.value="";ph.disabled=true;
-    ph.textContent=g.value?"Select section":"Select grade level first";
-    s.appendChild(ph);
-    list.forEach(x=>{const o=document.createElement("option");o.value=x;o.textContent=x;s.appendChild(o);});
-    s.value="";s.disabled=!g.value;
-  };
-  g.onchange=fillSections;
-  fillSections();
-}
-setupForm();
-
-/* ---------- routing: normal link = form, link#list = admin ---------- */
-function route(){
-  const admin=location.hash==="#list";
-  show("formView",!admin&&!sent);show("doneView",!admin&&sent);
-  show("adminView",admin);
-  $("logo").classList.toggle("hide",!admin&&sent);
-  if(admin){show("loginView",!user);show("listView",!!user);if(user)startList();}
-}
-window.addEventListener("hashchange",route);
-onAuthStateChanged(auth,u=>{
-  user=u;
-  if(!u&&unsub){unsub();unsub=null;all=[];}
-  if(!u&&unsubB){unsubB();unsubB=null;batches=[];}
-  route();
-});
-
-/* ---------- form for everyone ---------- */
-async function send(){
-  if(sending)return;
-  const name=clean($("sName").value),section=$("section").value,reason=clean($("reason").value);
-  if(!name)return say("msg","Enter the name of the student.","bad");
-  if(!$("grade").value)return say("msg","Select the grade level.","bad");
-  if(!section)return say("msg","Select the section.","bad");
-  if(!reason)return say("msg","Enter why it was lost.","bad");
-  sending=true;$("send").disabled=true;say("msg","Sending…","");
-  try{
-    const wait=new Promise((_,no)=>setTimeout(no,15000));
-    await Promise.race([addDoc(collection(db,COL),{name,section,reason,ts:Date.now(),done:false}),wait]);
-    $("sName").value="";$("reason").value="";$("grade").value="";$("grade").onchange();
-    say("msg","","");sent=true;route();
-  }catch(e){say("msg","Couldn’t send. Check your connection and try again.","bad");}
-  sending=false;$("send").disabled=false;
-}
-$("send").onclick=send;
-$("again").onclick=()=>{sent=false;route();};
-
-/* ---------- admin sign in ---------- */
-function login(){
-  const email=clean($("email").value),pw=$("pw").value;
-  if(!email||!pw)return say("lMsg","Enter your email and password.","bad");
-  say("lMsg","Signing in…","");
-  signInWithEmailAndPassword(auth,email,pw).then(()=>say("lMsg","","")).catch(()=>say("lMsg","Wrong email or password.","bad"));
-}
-$("login").onclick=login;
-$("out").onclick=()=>signOut(auth);
-
-document.addEventListener("keydown",e=>{
-  if(e.key!=="Enter"||e.target.tagName!=="INPUT"||e.target.type==="checkbox")return;
-  if(!$("formView").classList.contains("hide"))send();
-  else if(!$("loginView").classList.contains("hide"))login();
-});
-
-/* ---------- smarter "same student" detection ----------
-   Ignores case, accents, punctuation, spacing, word order, tiny typos (1 letter off),
-   initials ("J." matches "Jesse"), and missing middle names
-   ("Almacin Jesse" = "Jesse Harris Almacin" when both are in the same section). */
-function toks(s){
-  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(Boolean);
-}
-function lev(a,b){
-  if(Math.abs(a.length-b.length)>1)return 2;
-  const m=a.length,n=b.length,d=[];
-  for(let i=0;i<=m;i++){d[i]=[i];}
-  for(let j=1;j<=n;j++)d[0][j]=j;
-  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)
-    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
-  return d[m][n];
-}
-function tokEq(a,b){
-  if(a===b)return true;
-  if(a.length===1&&b[0]===a)return true;
-  if(b.length===1&&a[0]===b)return true;
-  return a.length>=4&&b.length>=4&&lev(a,b)<=1;
-}
-function covers(big,small){
-  const used=new Set();
-  return small.every(t=>{
-    const i=big.findIndex((b,k)=>!used.has(k)&&tokEq(t,b));
-    if(i<0)return false;used.add(i);return true;
-  });
-}
-function sameStudent(e,r){
-  const a=e._t,b=r._t;
-  if(!a.length||!b.length)return false;
-  if(a.length===b.length)return covers(b,a)&&covers(a,b);
-  const small=a.length<b.length?a:b,big=a.length<b.length?b:a;
-  return small.length>=2&&canon(e.section)===canon(r.section)&&covers(big,small);
-}
-/* groups every request into students; the longest name becomes the group's name */
-function cluster(){
-  all.forEach(e=>{e._t=toks(e.name);});
-  const order=all.slice().sort((x,y)=>y._t.length-x._t.length||(x.ts||0)-(y.ts||0));
-  const groups=[];
-  order.forEach(e=>{
-    let g=groups.find(g=>sameStudent(e,g.rep));
-    if(!g){g={rep:e,name:e.name||"",items:[]};groups.push(g);}
-    g.items.push(e);e._g=g;
-  });
-  groups.forEach(g=>{g.items.sort((a,b)=>(a.ts||0)-(b.ts||0));g.items.forEach((e,i)=>{e._n=i+1;});});
-  return groups;
-}
-
-/* ---------- batches ----------
-   Batch 1 = everything before the first "+ New batch". Each new batch starts the moment the admin
-   creates it, and a request belongs to the latest batch that had started when it was sent. */
-let batches=[],bsel="latest",P=[];
+/* ---------- batches (unchanged logic) ---------- */
 const curN=()=>batches.length?batches[batches.length-1].n:1;
 const selN=()=>bsel==="latest"?curN():bsel;
 const batchOf=e=>{if(Number.isFinite(e.batch))return e.batch;let n=1;const t=e.ts||0;for(const b of batches){if(t>=b.ts)n=b.n;else break;}return n;};
 const inB=e=>{const s=selN();return s==="all"||e._b===s;};
-const showBatch=()=>selN()==="all";
 const batchNums=()=>[1].concat(batches.map(b=>b.n)).filter((n,i,a)=>a.indexOf(n)===i).sort((a,b)=>b-a);
-function batchSelect(value,withAuto){
-  const s=document.createElement("select");
-  if(withAuto){const o=document.createElement("option");o.value="";o.textContent="Automatic (by date sent)";s.appendChild(o);}
-  batchNums().forEach(n=>{const o=document.createElement("option");o.value=String(n);o.textContent="Batch "+n;s.appendChild(o);});
-  s.value=value;return s;
-}
-function moveBatch(e,v){
-  const batch=v===""?null:Number(v);
-  updateDoc(doc(db,COL,e._id),{batch})
-    .then(()=>say("aMsg",batch===null?"Batch set to automatic.":"Moved to Batch "+batch+".","ok"))
-    .catch(()=>say("aMsg","Couldn’t move it. Try again.","bad"));
-}
-
-/* ---------- admin list ---------- */
-function startList(){
-  if(unsub)return;
-  unsub=onSnapshot(collection(db,COL),snap=>{
-    all=snap.docs.map(d=>({...d.data(),_id:d.id}));
-    all.sort((a,b)=>(a.ts||0)-(b.ts||0));
-    say("aMsg","","");render();
-  },()=>say("aMsg","Couldn’t load requests. Sign in with the admin email, then reload.","bad"));
-  unsubB=onSnapshot(collection(db,"batches"),snap=>{
-    batches=snap.docs.map(d=>({...d.data(),_id:d.id})).filter(b=>Number.isFinite(b.ts)&&Number.isFinite(b.n)).sort((a,b)=>a.ts-b.ts);
-    say("bMsg","","");render();
-  },()=>say("bMsg","Batches need a Firebase rule for “batches”. Until then everything stays in Batch 1.","bad"));
-}
-const setTab=t=>()=>{tab=t;render();};
-$("tWait").onclick=setTab("wait");$("tHist").onclick=setTab("hist");$("tSec").onclick=setTab("sec");
-$("copy").onclick=copyWaiting;
-
-$("bsel").onchange=()=>{
-  const v=$("bsel").value;
-  bsel=v==="all"?"all":(Number(v)===curN()?"latest":Number(v));
-  secLevel="grades";render();
-};
-$("newBatch").onclick=async()=>{
-  const n=curN()+1;
-  if(!confirm("Start Batch "+n+"?\n\nEvery request sent from now on goes into Batch "+n+". Earlier requests stay in their own batches."))return;
-  $("newBatch").disabled=true;
-  try{await addDoc(collection(db,"batches"),{n,ts:Date.now()});bsel="latest";secLevel="grades";say("aMsg","Batch "+n+" started.","ok");render();}
-  catch(e){say("bMsg","Couldn’t start a new batch. Check the Firebase rule for “batches”.","bad");}
-  $("newBatch").disabled=false;
-};
-$("undoBatch").onclick=()=>{
-  const b=batches[batches.length-1];if(!b)return;
-  const prev=batches.length>1?batches[batches.length-2].n:1;
-  if(!confirm("Undo Batch "+b.n+"?\n\nIts requests move back into Batch "+prev+"."))return;
-  deleteDoc(doc(db,"batches",b._id)).then(()=>{if(bsel===b.n)bsel="latest";render();})
-    .catch(()=>say("bMsg","Couldn’t undo the batch. Try again.","bad"));
-};
-function renderBatchBar(){
-  const sel=$("bsel"),cur=curN();
-  const nums=batchNums();
-  const stat=n=>all.filter(e=>e._b===n&&!e.done).length;
-  const sig=nums.map(n=>n+":"+stat(n)).join("|")+"|"+cur;
-  if(sel.dataset.sig!==sig){
-    sel.textContent="";
-    const oa=document.createElement("option");oa.value="all";oa.textContent="All batches";sel.appendChild(oa);
-    nums.forEach(n=>{const o=document.createElement("option");o.value=String(n);const w=all.filter(e=>e._b===n&&!e.done).length;o.textContent="Batch "+n+(n===cur?" (current)":(w?" · "+w+" waiting":""));sel.appendChild(o);});
-    sel.dataset.sig=sig;
-  }
-  sel.value=String(selN());
-  $("undoBatch").classList.toggle("hide",!batches.length);
-}
-
-function line(cls,text){const d=document.createElement("div");d.className=cls;d.textContent=text;return d;}
-
-let q="";
+const bLabel=()=>selN()==="all"?"All batches":"Batch "+selN()+(selN()===curN()?" · current":"");
 const vis=e=>!q||[e.name,canon(e.section),e.reason,e._g&&e._g.name].join(" ").toLowerCase().includes(q);
-$("q").oninput=()=>{q=clean($("q").value).toLowerCase();render();};
 
-function toggleExempt(e,btn){
-  btn.disabled=true;
-  updateDoc(doc(db,COL,e._id),{exempt:!e.exempt})
-    .catch(()=>say("aMsg","Couldn’t save. Try again.","bad"))
-    .then(()=>{btn.disabled=false;});
-}
+/* ---------- sheet (dialog) with focus trap, Esc, backdrop close, focus return, scroll lock ---------- */
+let closeSheet=()=>{};
+function sheet(title,build){
+  closeSheet();const prev=document.activeElement,layer=document.getElementById("layer");
+  const bd=el("div","backdrop"),sh=el("div","sheet");sh.setAttribute("role","dialog");sh.setAttribute("aria-modal","true");sh.setAttribute("aria-labelledby","shT");
+  sh.appendChild(el("div","sheet__grab"));const h=el("h2",null,title);h.id="shT";h.tabIndex=-1;sh.appendChild(h);
+  const close=()=>{document.removeEventListener("keydown",key);layer.textContent="";document.body.classList.remove("lock");closeSheet=()=>{};if(prev&&prev.isConnected)prev.focus();};
+  const key=ev=>{if(ev.key==="Escape"){ev.preventDefault();close();return;}
+   if(ev.key==="Tab"){const f=[...sh.querySelectorAll("button,input,select,[tabindex='0']")].filter(x=>!x.disabled);if(!f.length)return;const a=f[0],z=f[f.length-1];
+    if(ev.shiftKey&&(document.activeElement===a||document.activeElement===h)){ev.preventDefault();z.focus();}else if(!ev.shiftKey&&document.activeElement===z){ev.preventDefault();a.focus();}}};
+  bd.onclick=close;document.addEventListener("keydown",key);build(sh,close);layer.append(bd,sh);document.body.classList.add("lock");closeSheet=close;h.focus();return close;}
+function menu(title,items){sheet(title,(sh,close)=>{items.forEach(it=>{if(!it)return;const b=el("button","item"+(it.danger?" item--danger":"")+(it.sep?" item--sep":""),it.label);b.type="button";b.onclick=()=>{close();it.fn();};sh.appendChild(b);});});}
+function confirmSheet(title,text,okLabel,danger,fn){sheet(title,(sh,close)=>{sh.appendChild(el("p","muted",text));const a=el("div","sheet__actions");
+  a.appendChild(btn(okLabel,danger?"btn--danger":"",()=>{close();fn();}));a.appendChild(btn("Cancel","btn--text",close));sh.appendChild(a);});}
 
-function render(){
-  const groups=cluster();
-  all.forEach(e=>{e._b=batchOf(e);});
-  P=all.filter(inB);
-  const nW=P.filter(e=>!e.done).length,nH=groups.filter(g=>g.items.some(inB)).length,nS=new Set(P.map(e=>canon(e.section))).size;
-  [["tWait","wait","Waiting",nW],["tHist","hist","History",nH],["tSec","sec","Sections",nS]].forEach(([b,t,lab,n])=>{
-    const el=$(b);el.className=tab===t?"":"ghost";el.textContent=lab+" ";
-    const c=document.createElement("span");c.className="count";c.textContent=n;el.appendChild(c);
-  });
-  renderBatchBar();
-  const lost=P.length,ex=P.filter(e=>e.exempt).length;
-  $("sLost").textContent=lost.toLocaleString();
-  $("sEx").textContent=ex.toLocaleString();
-  $("sRev").textContent="₱"+((lost-ex)*PRICE).toLocaleString();
-  show("waitView",tab==="wait");show("histView",tab==="hist");show("secView",tab==="sec");
-  renderWaiting();renderHistory(groups);renderSections();
-}
-
-function makeEditor(e){
-  if(!draft.id||draft.id!==e._id)draft={id:e._id,name:e.name||"",section:canon(e.section),reason:e.reason||"",batch:Number.isFinite(e.batch)?String(e.batch):""};
-  const wrap=document.createElement("div");wrap.className="editor";
-  const mk=(lab,input)=>{const l=document.createElement("label");l.textContent=lab;wrap.appendChild(l);wrap.appendChild(input);};
-  const n=document.createElement("input");n.type="text";n.maxLength=100;n.value=draft.name;n.oninput=()=>{draft.name=n.value;};
-  const s=document.createElement("select");fillSelect(s,draft.section);s.onchange=()=>{draft.section=s.value;};
-  const r=document.createElement("input");r.type="text";r.maxLength=100;r.value=draft.reason;r.oninput=()=>{draft.reason=r.value;};
-  const bt=batchSelect(draft.batch,true);bt.onchange=()=>{draft.batch=bt.value;};
-  mk("Name of student",n);mk("Section",s);mk("Why was it lost?",r);mk("Batch",bt);
-  const row=document.createElement("div");row.className="row";
-  const save=document.createElement("button");save.type="button";save.textContent="Save";
-  const cancel=document.createElement("button");cancel.type="button";cancel.className="ghost";cancel.textContent="Cancel";
-  save.onclick=()=>{
-    const name=clean(draft.name),section=draft.section,reason=clean(draft.reason);
-    if(!name||!section||!reason)return say("aMsg","Name, section and reason can’t be empty.","bad");
-    save.disabled=true;
-    updateDoc(doc(db,COL,e._id),{name,section,reason,batch:draft.batch===""?null:Number(draft.batch)})
-      .then(()=>{editId=null;draft={};say("aMsg","Saved.","ok");render();})
-      .catch(()=>{save.disabled=false;say("aMsg","Couldn’t save. Try again.","bad");});
-  };
-  cancel.onclick=()=>{editId=null;draft={};say("aMsg","","");render();};
-  row.appendChild(save);row.appendChild(cancel);wrap.appendChild(row);
-  return wrap;
-}
-
-function renderWaiting(){
-  const body=$("rows");body.textContent="";
-  const pending=P.filter(e=>!e.done),done=P.filter(e=>e.done).reverse();
-  const shown=pending.concat(done).filter(e=>e._id===editId||vis(e));
-  shown.forEach(e=>{
-    const row=document.createElement("div");row.className="item"+(e.done?" done":"");
-    if(e._id===editId){
-      row.appendChild(makeEditor(e));body.appendChild(row);return;
-    }
-    const cb=document.createElement("input");cb.type="checkbox";cb.checked=!!e.done;cb.setAttribute("aria-label","Done: "+e.name);
-    cb.onchange=()=>{
-      cb.disabled=true;
-      updateDoc(doc(db,COL,e._id),{done:cb.checked})
-        .catch(()=>{say("aMsg","Couldn’t save. Try again.","bad");cb.checked=!cb.checked;})
-        .then(()=>{cb.disabled=false;});
-    };
-    const b=document.createElement("div");b.className="body";
-    b.appendChild(line("nm",e.name||""));
-    b.appendChild(line("meta",[canon(e.section),e.reason,when(e.ts),showBatch()?"Batch "+e._b:""].filter(Boolean).join(" · ")));
-    const tags=document.createElement("div");tags.className="tags";
-    const g=e._g,c=g.items.length;
-    if(c>1){
-      let t="Repeat: request #"+e._n+" of "+c+" for this student";
-      if(clean(g.name).toLowerCase()!==clean(e.name).toLowerCase())t+=" (matches “"+g.name+"”)";
-      tags.appendChild(line("flag",t));
-    }
-    if(e.exempt)tags.appendChild(line("flag ex","Exempt from ₱"+PRICE));
-    if(tags.children.length)b.appendChild(tags);
-    const acts=document.createElement("div");acts.className="acts";
-    const ed=document.createElement("button");ed.type="button";ed.className="del edit";ed.textContent="Edit";
-    ed.onclick=()=>{editId=e._id;draft={};say("aMsg","","");render();};
-    const ex=document.createElement("button");ex.type="button";ex.className="del";ex.textContent=e.exempt?"Undo exempt":"Exempt";
-    ex.onclick=()=>toggleExempt(e,ex);
-    const x=document.createElement("button");x.type="button";x.className="del";x.textContent="Delete";
-    x.onclick=()=>{if(confirm("Delete this request for "+e.name+"? It will also be removed from the history."))
-      deleteDoc(doc(db,COL,e._id)).catch(()=>say("aMsg","Couldn’t delete. Try again.","bad"));};
-    acts.appendChild(ed);acts.appendChild(ex);acts.appendChild(x);
-    row.appendChild(cb);row.appendChild(b);row.appendChild(acts);body.appendChild(row);
-  });
-  $("empty").textContent=emptyMsg();
-  $("empty").classList.toggle("hide",shown.length>0);
-  $("nWait").textContent=pending.length;
-}
-
-const emptyMsg=()=>!all.length?"No requests yet.":(!P.length?"Nothing in this batch yet.":"No matches.");
-function entryText(e,n){
-  return [(n?"#"+e._n:""),when(e.ts),canon(e.section),e.reason||"",showBatch()?"Batch "+e._b:"",e.done?"QR made":"waiting",e.exempt?"Exempt":""].filter(Boolean).join(" · ");
-}
-
-function renderHistory(groups){
-  const box=$("hist");box.textContent="";
-  const rows=groups.map(g=>({g,list:g.items.filter(inB)})).filter(r=>r.list.some(vis)).sort((a,b)=>{
-    const d=b.list.length-a.list.length;
-    return d||b.list[b.list.length-1].ts-a.list[a.list.length-1].ts;
-  });
-  rows.forEach(({g,list})=>{
-    const last=list[list.length-1];
-    const item=document.createElement("div");item.className="item";item.style.display="block";
-    const h=document.createElement("div");h.className="hh";
-    h.appendChild(line("nm",g.name));
-    const t=line("nm",list.length+(list.length===1?" time":" times"));
-    if(list.length>1)t.classList.add("rep");
-    h.appendChild(t);item.appendChild(h);
-    item.appendChild(line("meta",canon(last.section)||""));
-    const ul=document.createElement("ul");ul.className="log";
-    list.slice().reverse().forEach(e=>{
-      const li=document.createElement("li");
-      li.textContent=[entryText(e,true),e.name&&clean(e.name)!==clean(g.name)?"typed: "+e.name:""].filter(Boolean).join(" · ");
-      ul.appendChild(li);
-    });
-    item.appendChild(ul);box.appendChild(item);
-  });
-  $("histEmpty").textContent=emptyMsg();
-  $("histEmpty").classList.toggle("hide",rows.length>0);
-}
-
-/* ---------- Sections tab: Grade folders > Sections > Students (same drill-down as the main admin roster) ---------- */
-let secLevel="grades",secGrade=null,secSec=null;
-const OTHER="Other / unlisted";
-const gradeOf=s=>{const g=GRADES.find(x=>x[1].includes(s));return g?g[0]:OTHER;};
-const secCmp=(a,b)=>{const i=ALLSEC.indexOf(a),j=ALLSEC.indexOf(b);return (i<0?1e9:i)-(j<0?1e9:j)||a.localeCompare(b);};
-const plural=(n,w)=>n+" "+w+(n===1?"":"s");
-const SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
-const ICON_GRADE=SVG+'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></svg>';
-const ICON_SEC=SVG+'<circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14c2.6 0 4.5 1.8 4.5 4.5"/></svg>';
-function icon(svg){const d=document.createElement("span");d.className="f-ico";d.innerHTML=svg;return d;}
-function pill(text,cls){const s=document.createElement("span");s.className="pill"+(cls?" "+cls:"");s.textContent=text;return s;}
-function pills(es){
-  const p=document.createElement("span");p.className="pills";
-  p.appendChild(pill(es.length+" lost"));
-  const w=es.filter(e=>!e.done).length;
-  if(w)p.appendChild(pill(w+" waiting","hot"));
-  return p;
-}
-function secGo(level,grade,sec){secLevel=level;secGrade=grade||null;secSec=sec||null;window.scrollTo(0,0);render();}
-function crumb(backLabel,backFn,title,count){
-  const c=document.createElement("div");c.className="crumb";
-  const b=document.createElement("button");b.type="button";b.className="back";b.textContent="← "+backLabel;b.onclick=backFn;
-  c.appendChild(b);
-  const h=document.createElement("div");h.className="crumb-row";
-  h.appendChild(line("crumb-t",title));
-  if(count)h.appendChild(line("crumb-n",count));
-  c.appendChild(h);return c;
-}
-const initials=n=>{const t=String(n||"").trim().split(/\s+/).filter(Boolean);return(((t[0]||"")[0]||"")+(t.length>1?t[t.length-1][0]:"")).toUpperCase()||"?";};
-
-function renderSections(){
-  const box=$("secs");box.textContent="";
-  const byGrade=new Map();
-  P.filter(vis).forEach(e=>{
-    const s=canon(e.section),g=gradeOf(s);
-    if(!byGrade.has(g))byGrade.set(g,new Map());
-    const m=byGrade.get(g);if(!m.has(s))m.set(s,[]);m.get(s).push(e);
-  });
-  if(secLevel==="roster"&&!(byGrade.get(secGrade)&&byGrade.get(secGrade).has(secSec)))secLevel="sections";
-  if(secLevel==="sections"&&!byGrade.get(secGrade))secLevel="grades";
-  const stuN=es=>new Set(es.map(e=>e._g)).size;
-
-  if(secLevel==="grades"){
-    const grid=document.createElement("div");grid.className="folders";
-    GRADES.map(g=>g[0]).concat(OTHER).filter(g=>byGrade.has(g)).forEach(g=>{
-      const m=byGrade.get(g),es=[].concat(...m.values());
-      const c=document.createElement("button");c.type="button";c.className="folder";
-      c.appendChild(icon(ICON_GRADE));
-      c.appendChild(line("f-name",g));
-      c.appendChild(line("f-meta",plural(m.size,"section")+" · "+plural(stuN(es),"student")));
-      c.appendChild(pills(es));
-      c.onclick=()=>secGo("sections",g);
-      grid.appendChild(c);
-    });
-    box.appendChild(grid);
-  }else if(secLevel==="sections"){
-    const m=byGrade.get(secGrade);
-    box.appendChild(crumb("All grade levels",()=>secGo("grades"),secGrade,plural(m.size,"section")));
-    const list=document.createElement("div");list.className="srows";
-    [...m.keys()].sort(secCmp).forEach(s=>{
-      const es=m.get(s);
-      const r=document.createElement("button");r.type="button";r.className="srow";
-      r.appendChild(icon(ICON_SEC));
-      const bd=document.createElement("span");bd.className="srow-body";
-      bd.appendChild(line("f-name",s));bd.appendChild(line("f-meta",plural(stuN(es),"student")));
-      r.appendChild(bd);r.appendChild(pills(es));
-      r.onclick=()=>secGo("roster",secGrade,s);
-      list.appendChild(r);
-    });
-    box.appendChild(list);
-  }else{
-    const es=byGrade.get(secGrade).get(secSec);
-    const gs=[...new Set(es.map(e=>e._g))].sort((a,b)=>a.name.localeCompare(b.name));
-    box.appendChild(crumb(secGrade,()=>secGo("sections",secGrade),secSec,plural(gs.length,"student")));
-    gs.forEach(g=>{
-      const mine=es.filter(e=>e._g===g).sort((a,b)=>(b.ts||0)-(a.ts||0));
-      const card=document.createElement("div");card.className="stu";
-      const top=document.createElement("div");top.className="stu-top";
-      const av=document.createElement("span");av.className="avatar";av.textContent=initials(g.name);
-      const bd=document.createElement("div");bd.className="stu-body";
-      bd.appendChild(line("nm",g.name));
-      bd.appendChild(line("meta",[mine[0].reason,when(mine[0].ts)].filter(Boolean).join(" · ")));
-      top.appendChild(av);top.appendChild(bd);
-      const t=pill(mine.length+(mine.length===1?" time":" times"),mine.length>1?"rep":"");
-      top.appendChild(t);card.appendChild(top);
-      const ul=document.createElement("ul");ul.className="stu-log";
-      mine.forEach(e=>{
-        const li=document.createElement("li");
-        li.appendChild(Object.assign(document.createElement("span"),{textContent:[when(e.ts),e.reason||"",e.done?"QR made":"waiting",e.exempt?"Exempt":""].filter(Boolean).join(" · ")}));
-        const ex=document.createElement("button");ex.type="button";ex.className="mini";ex.textContent=e.exempt?"Undo exempt":"Exempt";
-        ex.onclick=()=>toggleExempt(e,ex);
-        const mv=batchSelect(String(e._b),false);mv.className="mini-sel";mv.title="Move to batch";mv.setAttribute("aria-label","Batch");
-        mv.onchange=()=>moveBatch(e,mv.value);
-        const act=document.createElement("span");act.className="li-acts";act.appendChild(mv);act.appendChild(ex);
-        li.appendChild(act);ul.appendChild(li);
-      });
-      card.appendChild(ul);box.appendChild(card);
-    });
-  }
-  $("secEmpty").textContent=emptyMsg();
-  $("secEmpty").classList.toggle("hide",box.children.length>0);
-}
-
-function copyWaiting(){
-  cluster();
-  const seen=new Set();
-  const list=P.filter(e=>{if(e.done||seen.has(e._g))return false;seen.add(e._g);return true;});
-  if(!list.length)return say("aMsg","Nothing waiting.","bad");
+/* ---------- actions ---------- */
+const flash=id=>{flashId=id;setTimeout(()=>{flashId=null;},900);};
+const toggleExempt=e=>{flash(e._id);updateDoc(doc(db,COL,e._id),{exempt:!e.exempt}).then(()=>say(e.exempt?"Marked as paying.":"Marked exempt.")).catch(()=>say("Couldn’t save. Try again.","bad"));};
+const toggleDone=(e,cb)=>{cb.disabled=true;flash(e._id);updateDoc(doc(db,COL,e._id),{done:cb.checked}).catch(()=>say("Couldn’t save. Try again.","bad"));};
+function moveSheet(e){sheet("Move to batch",(sh,close)=>{const cur=Number.isFinite(e.batch)?e.batch:"auto";
+  const row=(label,sub,val,on)=>{const b=el("button","item",null);b.type="button";b.setAttribute("role","menuitemradio");b.setAttribute("aria-checked",String(on));
+   const t=el("span","item__txt");t.appendChild(document.createTextNode(label));if(sub)t.appendChild(el("span","item__sub",sub));b.appendChild(t);if(on)b.appendChild(el("span","tick",null,IC.check));
+   b.onclick=()=>{close();flash(e._id);updateDoc(doc(db,COL,e._id),{batch:val}).then(()=>say(val===null?"Batch set to automatic.":"Moved to Batch "+val+".")).catch(()=>say("Couldn’t move it. Try again.","bad"));};sh.appendChild(b);};
+  batchNums().forEach(n=>row("Batch "+n,n===curN()?"Current":"",n,cur===n));row("Automatic","By the date it was sent",null,cur==="auto");});}
+function editSheet(e){sheet("Edit request",(sh,close)=>{
+  const f=(lab,input)=>{const l=el("label","field",lab);l.appendChild(input);sh.appendChild(l);};
+  const n=el("input");n.type="text";n.maxLength=100;n.value=e.name||"";
+  const s=el("select");ALLSEC.forEach(x=>{const o=el("option",null,x);o.value=x;s.appendChild(o);});const c=canon(e.section);if(!ALLSEC.includes(c)){const o=el("option",null,c);o.value=c;s.appendChild(o);}s.value=c;
+  const r=el("input");r.type="text";r.maxLength=100;r.value=e.reason||"";
+  f("Name of student",n);f("Section",s);f("Why was it lost?",r);
+  const a=el("div","sheet__actions"),sv2=btn("Save","",()=>{const name=clean(n.value),reason=clean(r.value);if(!name||!reason)return say("Name and reason can’t be empty.","bad");
+   sv2.disabled=true;flash(e._id);updateDoc(doc(db,COL,e._id),{name,section:s.value,reason}).then(()=>{close();say("Saved.");}).catch(()=>{sv2.disabled=false;say("Couldn’t save. Try again.","bad");});});
+  a.appendChild(sv2);a.appendChild(btn("Cancel","btn--text",close));sh.appendChild(a);});}
+function reqMenu(e){menu(e.name||"Request",[{label:"Edit",fn:()=>editSheet(e)},{label:e.exempt?"Undo exempt":"Exempt from ₱"+PRICE,fn:()=>toggleExempt(e)},{label:"Move to batch…",fn:()=>moveSheet(e)},
+  {label:"Delete",danger:true,sep:true,fn:()=>confirmSheet("Delete this request?","Request for "+e.name+" will be removed, including from the student’s history.","Delete",true,()=>deleteDoc(doc(db,COL,e._id)).then(()=>say("Deleted.")).catch(()=>say("Couldn’t delete. Try again.","bad")))}]);}
+function newBatch(){const n=curN()+1;confirmSheet("Start Batch "+n+"?","Every request sent from now on goes into Batch "+n+". Earlier requests stay in their own batches.","Start Batch "+n,false,()=>
+  addDoc(collection(db,"batches"),{n,ts:Date.now()}).then(()=>{bsel="latest";sv={lvl:"grades"};say("Batch "+n+" started.");}).catch(()=>say("Couldn’t start a new batch.","bad")));}
+function undoBatch(){const b=batches[batches.length-1];if(!b)return;const prev=batches.length>1?batches[batches.length-2].n:1;
+  confirmSheet("Undo Batch "+b.n+"?","Its requests move back into Batch "+prev+".","Undo Batch "+b.n,true,()=>deleteDoc(doc(db,"batches",b._id)).then(()=>{if(bsel===b.n)bsel="latest";say("Batch undone.");}).catch(()=>say("Couldn’t undo. Try again.","bad")));}
+function batchSheet(){sheet("Choose batch",(sh,close)=>{
+  sh.appendChild(el("p","muted","A batch is a group of requests. Start a new one when you begin a new round of QR making."));
+  const row=(label,sub,val,on)=>{const b=el("button","item");b.type="button";b.setAttribute("role","menuitemradio");b.setAttribute("aria-checked",String(on));
+   const t=el("span","item__txt");t.appendChild(document.createTextNode(label));t.appendChild(el("span","item__sub",sub));b.appendChild(t);if(on)b.appendChild(el("span","tick",null,IC.check));
+   b.onclick=()=>{bsel=val;sv={lvl:"grades"};close();render();};sh.appendChild(b);};
+  const stat=n=>{const es=all.filter(e=>e._b===n);return es.length+" lost · "+es.filter(e=>!e.done).length+" waiting";};
+  row("All batches",plural(all.length,"request"),"all",selN()==="all");
+  batchNums().forEach(n=>row("Batch "+n+(n===curN()?" · current":""),stat(n),n===curN()?"latest":n,selN()===n));
+  const a=el("div","sheet__actions");a.appendChild(btn("Start a new batch","",()=>{close();newBatch();}));
+  if(batches.length)a.appendChild(btn("Undo latest batch","btn--text",()=>{close();undoBatch();}));sh.appendChild(a);});}
+function copyWaiting(){cluster();const seen=new Set();const list=all.filter(inB).filter(e=>{if(e.done||seen.has(e._g))return false;seen.add(e._g);return true;});
+  if(!list.length)return say("Nothing waiting.","bad");
   const text=["Name of student\tSection\tReason"].concat(list.map(e=>[e._g.name,canon(e.section),e.reason||""].join("\t"))).join("\n");
-  const ok=()=>say("aMsg","Copied "+list.length+".","ok");
-  const fb=()=>{const t=document.createElement("textarea");t.value=text;document.body.appendChild(t);t.select();let r=false;try{r=document.execCommand("copy");}catch(e){}document.body.removeChild(t);r?ok():say("aMsg","Copy failed. Try again.","bad");};
-  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,fb);else fb();
-}
+  const ok=()=>say("Copied "+list.length+".");const fb=()=>{const t=el("textarea");t.value=text;document.body.appendChild(t);t.select();let r=false;try{r=document.execCommand("copy");}catch(x){}document.body.removeChild(t);r?ok():say("Copy failed. Try again.","bad");};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,fb);else fb();}
+const moreMenu=()=>menu("Menu",[{label:"Copy waiting list",fn:copyWaiting},{label:"Start a new batch",fn:newBatch},batches.length?{label:"Undo latest batch",fn:undoBatch}:null,{label:"Sign out",sep:true,fn:()=>signOut(auth)}]);
 
-route();
+/* ---------- admin render ---------- */
+function empty(text){const d=el("div","empty",null,IC.box);d.appendChild(el("p",null,text));return d;}
+const emptyMsg=()=>!all.length?"No requests yet.":(!all.filter(inB).length?"Nothing in this batch yet.":(q?"No matches for “"+q+"”.":"Nothing waiting. Nice work."));
+function requestCard(e){const card=el("div","card"+(e.done?" card--done":"")+(e._id===flashId?" card--flash":""));
+  const lab=el("label","check");const cb=el("input");cb.type="checkbox";cb.checked=!!e.done;cb.setAttribute("aria-label","QR made: "+e.name);cb.onchange=()=>toggleDone(e,cb);lab.appendChild(cb);
+  const b=el("div","card__body");b.appendChild(el("div","card__title wrap",e.name||""));
+  b.appendChild(el("div","card__meta wrap",[canon(e.section),e.reason,when(e.ts),selN()==="all"?"Batch "+e._b:"",e.exempt?"Exempt":""].filter(Boolean).join(" · ")));
+  const c=e._g.items.length;
+  if(e.done)b.appendChild(pill("QR made","outline"));else if(c>1)b.appendChild(pill("Repeat · "+ord(e._n)+" of "+c,"repeat"));
+  card.append(lab,b,ibtn(IC.dots,"Actions for "+e.name,()=>reqMenu(e)));return card;}
+function hero(P){const lost=P.length,ex=P.filter(e=>e.exempt).length,h=el("section","hero");h.setAttribute("aria-label","Summary");
+  h.appendChild(el("div","hero__label","Revenue · "+bLabel()));h.appendChild(el("div","hero__num","₱"+((lost-ex)*PRICE).toLocaleString()));
+  const s=el("div","hero__sub");const a=el("span",null,"Lost QR ");a.appendChild(el("b",null,lost));const b=el("span",null,"Exempt ");b.appendChild(el("b",null,ex));s.append(a,b,el("span",null,"₱"+PRICE+" each"));h.appendChild(s);return h;}
+function searchBox(){const w=el("div","search");w.appendChild(el("span","ico",null,IC.search));const i=el("input");i.type="text";i.id="q";i.autocomplete="off";i.placeholder="Search name, section or reason";i.setAttribute("aria-label","Search");i.value=q;
+  i.oninput=()=>{q=clean(i.value).toLowerCase();const p=i.selectionStart;render();const n=document.getElementById("q");n.focus();n.setSelectionRange(p,p);};w.appendChild(i);
+  if(q)w.appendChild(ibtn(IC.x,"Clear search",()=>{q="";render();}));return w;}
+function renderTodo(box,P){
+  const pending=P.filter(e=>!e.done),done=P.filter(e=>e.done).reverse();
+  const shown=pending.concat(done).filter(vis);
+  const other=all.filter(e=>!e.done&&selN()!=="all"&&e._b!==selN());
+  if(other.length){const byB={};other.forEach(e=>{byB[e._b]=(byB[e._b]||0)+1;});const k=Object.keys(byB).sort((a,b)=>b-a)[0];
+   const h=el("div","hint",plural(other.length,"request")+" still waiting in "+(Object.keys(byB).length>1?"older batches":"Batch "+k)+".");
+   const v=el("button",null,"View all");v.type="button";v.onclick=()=>{bsel="all";render();};h.appendChild(v);box.appendChild(h);}
+  box.appendChild(el("div","sec-head")).append(el("h2",null,"To do · "+pending.length+" waiting"));
+  const list=el("div","stack");shown.forEach(e=>list.appendChild(requestCard(e)));box.appendChild(list);
+  if(!shown.length)box.appendChild(empty(emptyMsg()));}
+const gradeOf=s=>{const g=GRADES.find(x=>x[1].includes(s));return g?g[0]:"Other";};
+function studentRow(g,es,showSec){const mine=es.filter(e=>e._g===g);const r=el("button","row");r.type="button";
+  r.appendChild(el("span","ico avatar",initials(g.name)));const b=el("span","row__body");b.appendChild(el("div","card__title wrap",g.name));
+  b.appendChild(el("div","card__meta",(showSec?canon(mine[0].section)+" · ":"")+(mine.filter(e=>!e.done).length?mine.filter(e=>!e.done).length+" waiting":"All QR made")));r.appendChild(b);
+  r.appendChild(pill(plural(mine.length,"loss").replace("losss","losses"),mine.length>1?"repeat":""));r.insertAdjacentHTML("beforeend",IC.chev);r.onclick=()=>{sv={...sv,lvl:"student",st:g.items[0]._id};render();window.scrollTo(0,0);};return r;}
+function crumbs(parts){const n=el("nav","crumbs");n.setAttribute("aria-label","Breadcrumb");
+  if(parts.length>1){const back=parts[parts.length-2];n.appendChild(ibtn(IC.back,"Back to "+back.t,back.fn));}
+  parts.forEach((p,i)=>{if(i)n.appendChild(el("span","sep","›"));if(i===parts.length-1){const c=el("span",null,p.t);c.setAttribute("aria-current","location");c.className="wrap";n.appendChild(c);}else{const b=el("button",null,p.t);b.type="button";b.onclick=p.fn;n.appendChild(b);}});return n;}
+const goSv=o=>()=>{sv=o;render();window.scrollTo(0,0);};
+function renderStudents(box,P,groups){
+  const wrap=el("div","view");
+  if(q){const gs=[...new Set(P.filter(vis).map(e=>e._g))];
+   wrap.appendChild(el("div","sec-head")).append(el("h2",null,plural(gs.length,"student")));
+   gs.sort((a,b)=>a.name.localeCompare(b.name)).forEach(g=>wrap.appendChild(studentRow(g,P.filter(e=>e._g===g),true)));if(!gs.length)wrap.appendChild(empty(emptyMsg()));box.appendChild(wrap);return;}
+  const byGrade=new Map();P.forEach(e=>{const s=canon(e.section),g=gradeOf(s);if(!byGrade.has(g))byGrade.set(g,new Map());const m=byGrade.get(g);if(!m.has(s))m.set(s,[]);m.get(s).push(e);});
+  const stuN=es=>new Set(es.map(e=>e._g)).size;
+  if(sv.lvl==="student"){const st=all.find(e=>e._id===sv.st);if(!st)sv={lvl:"grades"};}
+  if(sv.lvl==="sections"&&!byGrade.get(sv.g))sv={lvl:"grades"};
+  if(sv.lvl==="roster"&&!(byGrade.get(sv.g)&&byGrade.get(sv.g).has(sv.s)))sv={lvl:"grades"};
+  if(sv.lvl==="grades"){wrap.appendChild(crumbs([{t:"Students"}]));const grid=el("div","folders");
+   GRADES.map(g=>g[0]).filter(g=>byGrade.has(g)).forEach(g=>{const m=byGrade.get(g),es=[].concat(...m.values());const t=el("button","tile");t.type="button";
+    t.appendChild(el("span","ico",null,IC.grade));t.appendChild(el("div","card__title",g));t.appendChild(el("div","card__meta",plural(stuN(es),"student")));
+    const w=es.filter(e=>!e.done).length;t.appendChild(pill(w?w+" waiting":"All done",w?"strong":""));t.onclick=goSv({lvl:"sections",g});grid.appendChild(t);});
+   wrap.appendChild(el("div","sec-head")).append(el("span","muted","Pick a grade level"));wrap.lastChild.remove();wrap.appendChild(grid);if(!grid.children.length)wrap.appendChild(empty(emptyMsg()));}
+  else if(sv.lvl==="sections"){wrap.appendChild(crumbs([{t:"Students",fn:goSv({lvl:"grades"})},{t:sv.g}]));const m=byGrade.get(sv.g);
+   [...m.keys()].sort((a,b)=>ALLSEC.indexOf(a)-ALLSEC.indexOf(b)).forEach(s=>{const es=m.get(s),r=el("button","row");r.type="button";r.appendChild(el("span","ico",null,IC.people));
+    const b=el("span","row__body");b.appendChild(el("div","card__title",s));b.appendChild(el("div","card__meta",plural(stuN(es),"student")));r.appendChild(b);
+    const w=es.filter(e=>!e.done).length;if(w)r.appendChild(pill(w+" waiting","strong"));r.insertAdjacentHTML("beforeend",IC.chev);r.onclick=goSv({lvl:"roster",g:sv.g,s});wrap.appendChild(r);});}
+  else if(sv.lvl==="roster"){wrap.appendChild(crumbs([{t:"Students",fn:goSv({lvl:"grades"})},{t:sv.g,fn:goSv({lvl:"sections",g:sv.g})},{t:sv.s}]));
+   const es=byGrade.get(sv.g).get(sv.s);[...new Set(es.map(e=>e._g))].sort((a,b)=>a.name.localeCompare(b.name)).forEach(g=>wrap.appendChild(studentRow(g,es,false)));}
+  else{const st=all.find(e=>e._id===sv.st),g=st._g,mine=g.items.filter(inB).slice().reverse(),s=canon(g.items[0].section);
+   wrap.appendChild(crumbs([{t:"Students",fn:goSv({lvl:"grades"})},{t:gradeOf(s),fn:goSv({lvl:"sections",g:gradeOf(s)})},{t:s,fn:goSv({lvl:"roster",g:gradeOf(s),s})},{t:g.name}]));
+   const head=el("div","card");head.appendChild(el("span","ico avatar",initials(g.name)));const b=el("div","card__body");b.appendChild(el("div","card__title wrap",g.name));b.appendChild(el("div","card__meta",s));head.appendChild(b);
+   head.appendChild(pill(mine.length+(mine.length===1?" loss":" losses"),mine.length>1?"repeat":""));wrap.appendChild(head);
+   const ul=el("div","stack");ul.classList.add("sec-head");ul.classList.remove("sec-head");
+   mine.forEach(e=>{const c=el("div","card"+(e._id===flashId?" card--flash":""));const bb=el("div","card__body");bb.appendChild(el("div","card__title",e.reason||"—"));
+    bb.appendChild(el("div","card__meta",[when(e.ts),selN()==="all"?"Batch "+e._b:"",e.exempt?"Exempt":""].filter(Boolean).join(" · ")));c.appendChild(bb);c.appendChild(pill(e.done?"QR made":"Waiting",e.done?"outline":"strong"));
+    c.appendChild(ibtn(IC.dots,"Actions for "+e.reason,()=>reqMenu(e)));ul.appendChild(c);});
+   const h=el("div","sec-head");h.appendChild(el("h2",null,"Losses"));wrap.appendChild(h);wrap.appendChild(ul);}
+  box.appendChild(wrap);}
+function renderAdmin(root){
+  const wide=tab==="sheet"?" page--wide":"";
+  const page=el("div","page stack"+wide);
+  const bar=el("header","appbar");bar.appendChild(el("img","logo logo--sm"));bar.firstChild.alt="ASTIG";bar.firstChild.src=LOGO;
+  bar.appendChild(el("h1",null,tab==="todo"?"Requests":tab==="sheet"?"Sheet":"Students"));
+  bar.appendChild(ibtn(IC.search,"Search",()=>{searchOpen=!searchOpen;render();if(searchOpen){const i=document.getElementById("q");i&&i.focus();}}));
+  bar.appendChild(ibtn(IC.dots,"More actions",moreMenu));page.appendChild(bar);
+  const main=el("main","stack");
+  if(!loaded){for(let i=0;i<4;i++)main.appendChild(el("div","skel"));page.appendChild(main);root.appendChild(page);root.appendChild(tabbar());return;}
+  if(tab==="sheet"&&sheetFull){const o=el("div","sheetfull");renderSheet(o);root.appendChild(o);return;}
+  const groups=cluster();all.forEach(e=>{e._b=batchOf(e);});const P=all.filter(inB);
+  const chip=el("button","chip");chip.type="button";chip.setAttribute("aria-label","Batch: "+bLabel()+". Change batch");chip.appendChild(el("span",null,"Viewing: "+bLabel()));chip.insertAdjacentHTML("beforeend",IC.down);chip.onclick=batchSheet;
+  main.appendChild(chip);if(tab!=="sheet")main.appendChild(hero(P));
+  if((searchOpen||q)&&tab!=="sheet")main.appendChild(searchBox());
+  if(tab==="todo")renderTodo(main,P);else if(tab==="sheet")renderSheet(main);else renderStudents(main,P,groups);
+  page.appendChild(main);root.appendChild(page);root.appendChild(tabbar());}
+function tabbar(){const n=el("nav","tabbar");n.setAttribute("aria-label","Main");
+  [["todo","To do",IC.list],["stu","Students",IC.people],["sheet","Sheet",IC.grid]].forEach(([k,l,ic])=>{const b=el("button");b.type="button";b.appendChild(el("span","ico",null,ic));b.appendChild(el("span",null,l));if(tab===k)b.setAttribute("aria-current","page");
+   b.onclick=()=>{tab=k;if(k==="stu")sv={lvl:"grades"};render();window.scrollTo(0,0);};n.appendChild(b);});return n;}
+
+/* ---------- mini spreadsheet, one per batch (same columns as KUWANG_BY_BATCH.xlsx) ---------- */
+const COLS=["LRN","First Name","Middle Name","Last Name","Extension","Parent Mobile No","Parent Email","Section"];
+function loadRows(n){const d=sheets.find(x=>x.n===n);let r=[];try{r=d?JSON.parse(d.rows):[];}catch(e){}while(r.length<15)r.push(Array(COLS.length).fill(""));return r;}
+function saveSheet(manual){clearTimeout(saveT);const n=sheetN,d=sheets.find(x=>x.n===n),rows=JSON.stringify(sheetDraft);
+  const p=d?updateDoc(doc(db,"sheets",d._id),{rows}):addDoc(collection(db,"sheets"),{n,rows});
+  return p.then(()=>{sheetDirty=false;const s=document.getElementById("saveState");if(s)s.textContent="Saved ✓ "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});if(manual)say("Saved.");})
+   .catch(()=>{const s=document.getElementById("saveState");if(s)s.textContent="Not saved. Check your connection.";say("Couldn’t save the sheet.","bad");});}
+function touchSheet(){sheetDirty=true;const s=document.getElementById("saveState");if(s)s.textContent="Saving…";clearTimeout(saveT);saveT=setTimeout(()=>saveSheet(false),1200);}
+function copySheet(){const rows=sheetDraft.filter(r=>r.some(c=>clean(c)));if(!rows.length)return say("Nothing to copy yet.","bad");
+  const text=[COLS].concat(rows).map(r=>r.join("\t")).join("\n");const ok=()=>say("Copied "+rows.length+" rows. Paste into Excel.");
+  const fb=()=>{const t=el("textarea");t.value=text;document.body.appendChild(t);t.select();let r=false;try{r=document.execCommand("copy");}catch(x){}document.body.removeChild(t);r?ok():say("Copy failed. Try again.","bad");};
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,fb);else fb();}
+function renderSheet(box){const n=selN()==="all"?curN():selN();if(sheetN!==n){sheetN=n;sheetDraft=loadRows(n);sheetDirty=false;}
+  if(!sheetFull)box.appendChild(el("p","muted","Batch "+n+" sheet. It saves by itself. You can paste straight from Excel."));
+  const bar=el("div","sheetbar");if(sheetFull)bar.appendChild(btn("Exit full screen","btn--secondary",()=>{sheetFull=false;render();}));bar.appendChild(btn("Copy all","",copySheet));bar.appendChild(btn("Save","btn--secondary",()=>saveSheet(true)));
+  if(!sheetFull)bar.appendChild(btn("Full screen","btn--secondary",()=>{sheetFull=true;render();}));bar.appendChild(btn("Add 10 rows","btn--text",()=>{for(let i=0;i<10;i++)sheetDraft.push(Array(COLS.length).fill(""));touchSheet();render();}));
+  const st=el("div","savestate",sheetFull?"Batch "+n:"");st.id="saveState";bar.appendChild(st);box.appendChild(bar);
+  const wrap=el("div","gridwrap");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Batch "+n+" spreadsheet");
+  const t=el("table","grid"),hr=el("tr");hr.appendChild(el("th","rn",""));COLS.forEach(c=>{const th=el("th",null,c);th.scope="col";hr.appendChild(th);});t.appendChild(el("thead")).appendChild(hr);
+  const tb=el("tbody");sheetDraft.forEach((row,ri)=>{const tr=el("tr");tr.appendChild(el("td","rn",ri+1));
+   COLS.forEach((c,ci)=>{const td=el("td"),i=el("input");i.type="text";i.value=row[ci]||"";i.setAttribute("aria-label",c+", row "+(ri+1));
+    i.oninput=()=>{sheetDraft[ri][ci]=i.value;touchSheet();};
+    i.onpaste=ev=>{const tx=(ev.clipboardData||window.clipboardData).getData("text");if(tx.indexOf("\t")<0&&tx.indexOf("\n")<0)return;ev.preventDefault();
+     tx.replace(/\r/g,"").replace(/\n$/,"").split("\n").forEach((line,dr)=>{while(sheetDraft.length<=ri+dr)sheetDraft.push(Array(COLS.length).fill(""));line.split("\t").forEach((v,dc)=>{if(ci+dc<COLS.length)sheetDraft[ri+dr][ci+dc]=v;});});
+     touchSheet();i.blur();render();};
+    i.onkeydown=ev=>{if(ev.key==="Enter"){ev.preventDefault();const nx=tb.children[ri+1];if(nx)nx.querySelectorAll("input")[ci].focus();}};
+    td.appendChild(i);tr.appendChild(td);});tb.appendChild(tr);});
+  t.appendChild(tb);wrap.appendChild(t);box.appendChild(wrap);}
+
+/* ---------- public form + sign in ---------- */
+function renderPublic(root){const page=el("div","page public");const logo=el("img","logo");logo.alt="ASTIG";logo.src=LOGO;if(!sent)page.appendChild(logo);
+  if(sent){page.appendChild(logo);const p=el("p","final","Kuhaa ra sa SSLG office, ");p.appendChild(el("strong",null,"AYAW NA WAD-A PLEASE"));page.appendChild(p);page.appendChild(btn("Send another","btn--secondary btn--full",()=>{sent=false;render();}));root.appendChild(page);return;}
+  const box=el("div","card-box");box.appendChild(el("h1",null,"Lost QR"));
+  const f=(lab,inp)=>{const l=el("label","field",lab);l.appendChild(inp);box.appendChild(l);return inp;};
+  const nm=el("input");nm.type="text";nm.maxLength=100;nm.placeholder="Jesse Harris Almacin";f("Name of student",nm);
+  const g=el("select");const gp=el("option","","Select grade level");gp.value="";gp.disabled=true;g.appendChild(gp);GRADES.forEach(([x])=>{const o=el("option",null,x);o.value=x;g.appendChild(o);});g.value="";f("Grade level",g);
+  const s=el("select");f("Section",s);const fill=()=>{s.textContent="";const ph=el("option",null,g.value?"Select section":"Select grade level first");ph.value="";ph.disabled=true;s.appendChild(ph);((GRADES.find(x=>x[0]===g.value)||[,[]])[1]).forEach(x=>{const o=el("option",null,x);o.value=x;s.appendChild(o);});s.value="";s.disabled=!g.value;};g.onchange=fill;fill();
+  const rs=el("input");rs.type="text";rs.maxLength=100;rs.placeholder="Lost ID";f("Why was it lost?",rs);
+  const msg=el("div","msg");msg.setAttribute("role","status");msg.setAttribute("aria-live","polite");
+  const send=btn("Send","btn--full",async()=>{const name=clean(nm.value),reason=clean(rs.value);msg.textContent=!name?"Enter the name of the student.":!g.value?"Select the grade level.":!s.value?"Select the section.":!reason?"Enter why it was lost.":"";if(msg.textContent)return;
+   send.disabled=true;await addDoc(collection(db,COL),{name,section:s.value,reason,ts:Date.now(),done:false});sent=true;render();});
+  send.classList.add("btn--send");box.appendChild(el("div","sec-head")).remove();box.appendChild(send);box.appendChild(msg);page.appendChild(box);root.appendChild(page);}
+function renderLogin(root){const page=el("div","page public");const logo=el("img","logo");logo.alt="ASTIG";logo.src=LOGO;page.appendChild(logo);const box=el("div","card-box");box.appendChild(el("h1",null,"Admin sign in"));
+  const f=(lab,t)=>{const l=el("label","field",lab);const i=el("input");i.type=t;l.appendChild(i);box.appendChild(l);return i;};const em=f("Email","email"),pw=f("Password","password");em.autocomplete="username";pw.autocomplete="current-password";
+  const msg=el("div","msg");msg.setAttribute("role","status");msg.setAttribute("aria-live","polite");
+  const go=()=>{const e=clean(em.value);if(!e||!pw.value){msg.textContent="Enter your email and password.";return;}msg.textContent="";signInWithEmailAndPassword(auth,e,pw.value).catch(()=>{msg.textContent="Wrong email or password.";});};
+  pw.onkeydown=ev=>{if(ev.key==="Enter")go();};
+  box.appendChild(btn("Sign in","btn--full",go));box.appendChild(msg);page.appendChild(box);root.appendChild(page);}
+
+/* ---------- routing + data ---------- */
+function startList(){if(unsub)return;
+  unsub=onSnapshot(collection(db,COL),snap=>{all=snap.docs.map(d=>({...d.data(),_id:d.id})).sort((a,b)=>(a.ts||0)-(b.ts||0));loaded=true;render();},()=>say("Couldn’t load requests.","bad"));
+  onSnapshot(collection(db,"sheets"),snap=>{sheets=snap.docs.map(d=>({...d.data(),_id:d.id}));if(!sheetDirty)sheetN=null;render();},()=>say("Sheets need a Firebase rule for “sheets”.","bad"));
+  unsubB=onSnapshot(collection(db,"batches"),snap=>{batches=snap.docs.map(d=>({...d.data(),_id:d.id})).filter(b=>Number.isFinite(b.ts)&&Number.isFinite(b.n)).sort((a,b)=>a.ts-b.ts);render();},()=>say("Batches need a Firebase rule for “batches”.","bad"));}
+function render(){const ae=document.activeElement;if(loaded&&ae&&ae.closest&&ae.closest(".grid"))return;const keep=document.activeElement&&document.activeElement.id==="q";const root=document.getElementById("app");root.textContent="";
+  if(location.hash!=="#list")return renderPublic(root);
+  if(!user)return renderLogin(root);startList();renderAdmin(root);}
+document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&sheetFull&&!document.querySelector(".sheet")){sheetFull=false;render();}});
+window.addEventListener("hashchange",render);
+onAuthStateChanged(auth,u=>{user=u;if(!u){unsub=unsubB=null;all=[];batches=[];loaded=false;}render();});
+const LOGO="astig.png";
+render();
 </script>
 </body>
 </html>
