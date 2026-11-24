@@ -47,14 +47,24 @@
           <div><h1>Requests</h1><p><span id="nWait">0</span> waiting</p></div>
           <div><button id="copy" type="button">Copy waiting</button> <button id="out" class="del" type="button">Sign out</button></div>
         </div>
-        <input id="q" class="search" type="text" autocomplete="off" placeholder="Search name, section or reason">
+        <div class="batchbar">
+          <select id="bsel" aria-label="Batch"></select>
+          <button id="newBatch" type="button">+ New batch</button>
+          <button id="undoBatch" type="button" class="ghost hide" title="Undo the latest batch" aria-label="Undo the latest batch">&#8630;</button>
+        </div>
+        <div class="msg" id="bMsg" role="status" aria-live="polite"></div>
         <div class="tabs">
           <button id="tWait" type="button">Waiting</button>
           <button id="tHist" type="button" class="ghost">History</button>
           <button id="tSec" type="button" class="ghost">Sections</button>
         </div>
       </div>
-      <div class="summary"><span>Lost QR <b id="sLost">0</b></span><span class="dot">&middot;</span><span>Revenue <b id="sRev">&#8369;0</b></span></div>
+      <div class="summary">
+        <span>Lost QR <b id="sLost">0</b></span><span class="dot">&middot;</span>
+        <span>Exempt <b id="sEx">0</b></span><span class="dot">&middot;</span>
+        <span>Revenue <b id="sRev">&#8369;0</b></span>
+      </div>
+      <input id="q" class="search" type="text" autocomplete="off" placeholder="Search name, section or reason">
       <div class="msg" id="aMsg" role="status" aria-live="polite" style="margin:8px 0"></div>
       <div id="waitView"><div id="rows"></div><p class="empty" id="empty">No requests yet.</p></div>
       <div id="histView" class="hide"><div id="hist"></div><p class="empty" id="histEmpty">No history yet.</p></div>
@@ -116,7 +126,7 @@ const say=(id,t,c)=>{const m=$(id);m.textContent=t;m.className="msg "+(c||"");};
 function clean(v){return String(v||"").replace(/\s+/g," ").trim();}
 const when=ts=>{try{return new Date(ts).toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"});}catch(e){return "";}};
 const PRICE=20;
-let all=[],unsub=null,tab="wait",sending=false,sent=false,user=null,editId=null,draft={};
+let all=[],unsub=null,unsubB=null,tab="wait",sending=false,sent=false,user=null,editId=null,draft={};
 
 /* form: pick grade level first, then only that grade's sections show */
 function setupForm(){
@@ -151,6 +161,7 @@ window.addEventListener("hashchange",route);
 onAuthStateChanged(auth,u=>{
   user=u;
   if(!u&&unsub){unsub();unsub=null;all=[];}
+  if(!u&&unsubB){unsubB();unsubB=null;batches=[];}
   route();
 });
 
@@ -241,6 +252,29 @@ function cluster(){
   return groups;
 }
 
+/* ---------- batches ----------
+   Batch 1 = everything before the first "+ New batch". Each new batch starts the moment the admin
+   creates it, and a request belongs to the latest batch that had started when it was sent. */
+let batches=[],bsel="latest",P=[];
+const curN=()=>batches.length?batches[batches.length-1].n:1;
+const selN=()=>bsel==="latest"?curN():bsel;
+const batchOf=e=>{if(Number.isFinite(e.batch))return e.batch;let n=1;const t=e.ts||0;for(const b of batches){if(t>=b.ts)n=b.n;else break;}return n;};
+const inB=e=>{const s=selN();return s==="all"||e._b===s;};
+const showBatch=()=>selN()==="all";
+const batchNums=()=>[1].concat(batches.map(b=>b.n)).filter((n,i,a)=>a.indexOf(n)===i).sort((a,b)=>b-a);
+function batchSelect(value,withAuto){
+  const s=document.createElement("select");
+  if(withAuto){const o=document.createElement("option");o.value="";o.textContent="Automatic (by date sent)";s.appendChild(o);}
+  batchNums().forEach(n=>{const o=document.createElement("option");o.value=String(n);o.textContent="Batch "+n;s.appendChild(o);});
+  s.value=value;return s;
+}
+function moveBatch(e,v){
+  const batch=v===""?null:Number(v);
+  updateDoc(doc(db,COL,e._id),{batch})
+    .then(()=>say("aMsg",batch===null?"Batch set to automatic.":"Moved to Batch "+batch+".","ok"))
+    .catch(()=>say("aMsg","Couldn’t move it. Try again.","bad"));
+}
+
 /* ---------- admin list ---------- */
 function startList(){
   if(unsub)return;
@@ -249,38 +283,90 @@ function startList(){
     all.sort((a,b)=>(a.ts||0)-(b.ts||0));
     say("aMsg","","");render();
   },()=>say("aMsg","Couldn’t load requests. Sign in with the admin email, then reload.","bad"));
+  unsubB=onSnapshot(collection(db,"batches"),snap=>{
+    batches=snap.docs.map(d=>({...d.data(),_id:d.id})).filter(b=>Number.isFinite(b.ts)&&Number.isFinite(b.n)).sort((a,b)=>a.ts-b.ts);
+    say("bMsg","","");render();
+  },()=>say("bMsg","Batches need a Firebase rule for “batches”. Until then everything stays in Batch 1.","bad"));
 }
 const setTab=t=>()=>{tab=t;render();};
 $("tWait").onclick=setTab("wait");$("tHist").onclick=setTab("hist");$("tSec").onclick=setTab("sec");
 $("copy").onclick=copyWaiting;
+
+$("bsel").onchange=()=>{
+  const v=$("bsel").value;
+  bsel=v==="all"?"all":(Number(v)===curN()?"latest":Number(v));
+  secLevel="grades";render();
+};
+$("newBatch").onclick=async()=>{
+  const n=curN()+1;
+  if(!confirm("Start Batch "+n+"?\n\nEvery request sent from now on goes into Batch "+n+". Earlier requests stay in their own batches."))return;
+  $("newBatch").disabled=true;
+  try{await addDoc(collection(db,"batches"),{n,ts:Date.now()});bsel="latest";secLevel="grades";say("aMsg","Batch "+n+" started.","ok");render();}
+  catch(e){say("bMsg","Couldn’t start a new batch. Check the Firebase rule for “batches”.","bad");}
+  $("newBatch").disabled=false;
+};
+$("undoBatch").onclick=()=>{
+  const b=batches[batches.length-1];if(!b)return;
+  const prev=batches.length>1?batches[batches.length-2].n:1;
+  if(!confirm("Undo Batch "+b.n+"?\n\nIts requests move back into Batch "+prev+"."))return;
+  deleteDoc(doc(db,"batches",b._id)).then(()=>{if(bsel===b.n)bsel="latest";render();})
+    .catch(()=>say("bMsg","Couldn’t undo the batch. Try again.","bad"));
+};
+function renderBatchBar(){
+  const sel=$("bsel"),cur=curN();
+  const nums=batchNums();
+  const stat=n=>all.filter(e=>e._b===n&&!e.done).length;
+  const sig=nums.map(n=>n+":"+stat(n)).join("|")+"|"+cur;
+  if(sel.dataset.sig!==sig){
+    sel.textContent="";
+    const oa=document.createElement("option");oa.value="all";oa.textContent="All batches";sel.appendChild(oa);
+    nums.forEach(n=>{const o=document.createElement("option");o.value=String(n);const w=all.filter(e=>e._b===n&&!e.done).length;o.textContent="Batch "+n+(n===cur?" (current)":(w?" · "+w+" waiting":""));sel.appendChild(o);});
+    sel.dataset.sig=sig;
+  }
+  sel.value=String(selN());
+  $("undoBatch").classList.toggle("hide",!batches.length);
+}
 
 function line(cls,text){const d=document.createElement("div");d.className=cls;d.textContent=text;return d;}
 
 let q="";
 const vis=e=>!q||[e.name,canon(e.section),e.reason,e._g&&e._g.name].join(" ").toLowerCase().includes(q);
 $("q").oninput=()=>{q=clean($("q").value).toLowerCase();render();};
+
+function toggleExempt(e,btn){
+  btn.disabled=true;
+  updateDoc(doc(db,COL,e._id),{exempt:!e.exempt})
+    .catch(()=>say("aMsg","Couldn’t save. Try again.","bad"))
+    .then(()=>{btn.disabled=false;});
+}
+
 function render(){
   const groups=cluster();
-  const nW=all.filter(e=>!e.done).length,nH=groups.length,nS=new Set(all.map(e=>canon(e.section))).size;
+  all.forEach(e=>{e._b=batchOf(e);});
+  P=all.filter(inB);
+  const nW=P.filter(e=>!e.done).length,nH=groups.filter(g=>g.items.some(inB)).length,nS=new Set(P.map(e=>canon(e.section))).size;
   [["tWait","wait","Waiting",nW],["tHist","hist","History",nH],["tSec","sec","Sections",nS]].forEach(([b,t,lab,n])=>{
     const el=$(b);el.className=tab===t?"":"ghost";el.textContent=lab+" ";
     const c=document.createElement("span");c.className="count";c.textContent=n;el.appendChild(c);
   });
-  const lost=all.length;
+  renderBatchBar();
+  const lost=P.length,ex=P.filter(e=>e.exempt).length;
   $("sLost").textContent=lost.toLocaleString();
-  $("sRev").textContent="\u20B1"+(lost*PRICE).toLocaleString();
+  $("sEx").textContent=ex.toLocaleString();
+  $("sRev").textContent="₱"+((lost-ex)*PRICE).toLocaleString();
   show("waitView",tab==="wait");show("histView",tab==="hist");show("secView",tab==="sec");
-  renderWaiting();renderHistory(groups);renderSections(groups);
+  renderWaiting();renderHistory(groups);renderSections();
 }
 
 function makeEditor(e){
-  if(!draft.id||draft.id!==e._id)draft={id:e._id,name:e.name||"",section:canon(e.section),reason:e.reason||""};
+  if(!draft.id||draft.id!==e._id)draft={id:e._id,name:e.name||"",section:canon(e.section),reason:e.reason||"",batch:Number.isFinite(e.batch)?String(e.batch):""};
   const wrap=document.createElement("div");wrap.className="editor";
   const mk=(lab,input)=>{const l=document.createElement("label");l.textContent=lab;wrap.appendChild(l);wrap.appendChild(input);};
   const n=document.createElement("input");n.type="text";n.maxLength=100;n.value=draft.name;n.oninput=()=>{draft.name=n.value;};
   const s=document.createElement("select");fillSelect(s,draft.section);s.onchange=()=>{draft.section=s.value;};
   const r=document.createElement("input");r.type="text";r.maxLength=100;r.value=draft.reason;r.oninput=()=>{draft.reason=r.value;};
-  mk("Name of student",n);mk("Section",s);mk("Why was it lost?",r);
+  const bt=batchSelect(draft.batch,true);bt.onchange=()=>{draft.batch=bt.value;};
+  mk("Name of student",n);mk("Section",s);mk("Why was it lost?",r);mk("Batch",bt);
   const row=document.createElement("div");row.className="row";
   const save=document.createElement("button");save.type="button";save.textContent="Save";
   const cancel=document.createElement("button");cancel.type="button";cancel.className="ghost";cancel.textContent="Cancel";
@@ -288,7 +374,7 @@ function makeEditor(e){
     const name=clean(draft.name),section=draft.section,reason=clean(draft.reason);
     if(!name||!section||!reason)return say("aMsg","Name, section and reason can’t be empty.","bad");
     save.disabled=true;
-    updateDoc(doc(db,COL,e._id),{name,section,reason})
+    updateDoc(doc(db,COL,e._id),{name,section,reason,batch:draft.batch===""?null:Number(draft.batch)})
       .then(()=>{editId=null;draft={};say("aMsg","Saved.","ok");render();})
       .catch(()=>{save.disabled=false;say("aMsg","Couldn’t save. Try again.","bad");});
   };
@@ -299,7 +385,7 @@ function makeEditor(e){
 
 function renderWaiting(){
   const body=$("rows");body.textContent="";
-  const pending=all.filter(e=>!e.done),done=all.filter(e=>e.done).reverse();
+  const pending=P.filter(e=>!e.done),done=P.filter(e=>e.done).reverse();
   const shown=pending.concat(done).filter(e=>e._id===editId||vis(e));
   shown.forEach(e=>{
     const row=document.createElement("div");row.className="item"+(e.done?" done":"");
@@ -315,35 +401,45 @@ function renderWaiting(){
     };
     const b=document.createElement("div");b.className="body";
     b.appendChild(line("nm",e.name||""));
-    b.appendChild(line("meta",[canon(e.section),e.reason,when(e.ts)].filter(Boolean).join(" · ")));
+    b.appendChild(line("meta",[canon(e.section),e.reason,when(e.ts),showBatch()?"Batch "+e._b:""].filter(Boolean).join(" · ")));
+    const tags=document.createElement("div");tags.className="tags";
     const g=e._g,c=g.items.length;
     if(c>1){
       let t="Repeat: request #"+e._n+" of "+c+" for this student";
       if(clean(g.name).toLowerCase()!==clean(e.name).toLowerCase())t+=" (matches “"+g.name+"”)";
-      b.appendChild(line("flag",t));
+      tags.appendChild(line("flag",t));
     }
+    if(e.exempt)tags.appendChild(line("flag ex","Exempt from ₱"+PRICE));
+    if(tags.children.length)b.appendChild(tags);
     const acts=document.createElement("div");acts.className="acts";
     const ed=document.createElement("button");ed.type="button";ed.className="del edit";ed.textContent="Edit";
     ed.onclick=()=>{editId=e._id;draft={};say("aMsg","","");render();};
+    const ex=document.createElement("button");ex.type="button";ex.className="del";ex.textContent=e.exempt?"Undo exempt":"Exempt";
+    ex.onclick=()=>toggleExempt(e,ex);
     const x=document.createElement("button");x.type="button";x.className="del";x.textContent="Delete";
     x.onclick=()=>{if(confirm("Delete this request for "+e.name+"? It will also be removed from the history."))
       deleteDoc(doc(db,COL,e._id)).catch(()=>say("aMsg","Couldn’t delete. Try again.","bad"));};
-    acts.appendChild(ed);acts.appendChild(x);
+    acts.appendChild(ed);acts.appendChild(ex);acts.appendChild(x);
     row.appendChild(cb);row.appendChild(b);row.appendChild(acts);body.appendChild(row);
   });
-  $("empty").textContent=all.length?"No matches.":"No requests yet.";
+  $("empty").textContent=emptyMsg();
   $("empty").classList.toggle("hide",shown.length>0);
   $("nWait").textContent=pending.length;
 }
 
+const emptyMsg=()=>!all.length?"No requests yet.":(!P.length?"Nothing in this batch yet.":"No matches.");
+function entryText(e,n){
+  return [(n?"#"+e._n:""),when(e.ts),canon(e.section),e.reason||"",showBatch()?"Batch "+e._b:"",e.done?"QR made":"waiting",e.exempt?"Exempt":""].filter(Boolean).join(" · ");
+}
+
 function renderHistory(groups){
   const box=$("hist");box.textContent="";
-  const order=groups.filter(g=>g.items.some(vis)).sort((a,b)=>{
-    const d=b.items.length-a.items.length;
-    return d||b.items[b.items.length-1].ts-a.items[a.items.length-1].ts;
+  const rows=groups.map(g=>({g,list:g.items.filter(inB)})).filter(r=>r.list.some(vis)).sort((a,b)=>{
+    const d=b.list.length-a.list.length;
+    return d||b.list[b.list.length-1].ts-a.list[a.list.length-1].ts;
   });
-  order.forEach(g=>{
-    const list=g.items,last=list[list.length-1];
+  rows.forEach(({g,list})=>{
+    const last=list[list.length-1];
     const item=document.createElement("div");item.className="item";item.style.display="block";
     const h=document.createElement("div");h.className="hh";
     h.appendChild(line("nm",g.name));
@@ -354,81 +450,122 @@ function renderHistory(groups){
     const ul=document.createElement("ul");ul.className="log";
     list.slice().reverse().forEach(e=>{
       const li=document.createElement("li");
-      li.textContent=["#"+e._n,when(e.ts),canon(e.section),e.reason||"",e.name&&clean(e.name)!==clean(g.name)?"typed: "+e.name:"",e.done?"QR made":"waiting"].filter(Boolean).join(" · ");
+      li.textContent=[entryText(e,true),e.name&&clean(e.name)!==clean(g.name)?"typed: "+e.name:""].filter(Boolean).join(" · ");
       ul.appendChild(li);
     });
     item.appendChild(ul);box.appendChild(item);
   });
-  $("histEmpty").textContent=all.length?"No matches.":"No history yet.";
-  $("histEmpty").classList.toggle("hide",order.length>0);
+  $("histEmpty").textContent=emptyMsg();
+  $("histEmpty").classList.toggle("hide",rows.length>0);
 }
 
-/* Sections tab: students stored per section, divided by grade level (tap a grade to open its sections) */
-const openKeys=new Set();
-function badges(n,w){
-  const s=document.createElement("span");s.className="badges";
-  const a=document.createElement("em");a.className="b-n";a.textContent=n+(n===1?" student":" students");s.appendChild(a);
-  if(w){const b=document.createElement("em");b.className="b-w";b.textContent=w+" waiting";s.appendChild(b);}
-  return s;
+/* ---------- Sections tab: Grade folders > Sections > Students (same drill-down as the main admin roster) ---------- */
+let secLevel="grades",secGrade=null,secSec=null;
+const OTHER="Other / unlisted";
+const gradeOf=s=>{const g=GRADES.find(x=>x[1].includes(s));return g?g[0]:OTHER;};
+const secCmp=(a,b)=>{const i=ALLSEC.indexOf(a),j=ALLSEC.indexOf(b);return (i<0?1e9:i)-(j<0?1e9:j)||a.localeCompare(b);};
+const plural=(n,w)=>n+" "+w+(n===1?"":"s");
+const SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+const ICON_GRADE=SVG+'<path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></svg>';
+const ICON_SEC=SVG+'<circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14c2.6 0 4.5 1.8 4.5 4.5"/></svg>';
+function icon(svg){const d=document.createElement("span");d.className="f-ico";d.innerHTML=svg;return d;}
+function pill(text,cls){const s=document.createElement("span");s.className="pill"+(cls?" "+cls:"");s.textContent=text;return s;}
+function pills(es){
+  const p=document.createElement("span");p.className="pills";
+  p.appendChild(pill(es.length+" lost"));
+  const w=es.filter(e=>!e.done).length;
+  if(w)p.appendChild(pill(w+" waiting","hot"));
+  return p;
 }
-function renderSections(groups){
+function secGo(level,grade,sec){secLevel=level;secGrade=grade||null;secSec=sec||null;window.scrollTo(0,0);render();}
+function crumb(backLabel,backFn,title,count){
+  const c=document.createElement("div");c.className="crumb";
+  const b=document.createElement("button");b.type="button";b.className="back";b.textContent="← "+backLabel;b.onclick=backFn;
+  c.appendChild(b);
+  const h=document.createElement("div");h.className="crumb-row";
+  h.appendChild(line("crumb-t",title));
+  if(count)h.appendChild(line("crumb-n",count));
+  c.appendChild(h);return c;
+}
+const initials=n=>{const t=String(n||"").trim().split(/\s+/).filter(Boolean);return(((t[0]||"")[0]||"")+(t.length>1?t[t.length-1][0]:"")).toUpperCase()||"?";};
+
+function renderSections(){
   const box=$("secs");box.textContent="";
-  const known=new Set(ALLSEC);
-  const extras=[...new Set(all.map(e=>canon(e.section)).filter(s=>s&&!known.has(s)))].sort();
-  const blocks=GRADES.map(([g,list])=>[g,list]);
-  if(extras.length)blocks.push(["Other / unlisted",extras]);
-  blocks.forEach(([gname,list])=>{
-    const inSec=s=>all.filter(e=>canon(e.section)===s&&vis(e));
-    const used=list.filter(s=>inSec(s).length);
-    if(!used.length)return;
-    const gEntries=all.filter(e=>list.includes(canon(e.section))||(gname==="Other / unlisted"));
-    const gStu=new Set(gEntries.map(e=>e._g)).size,gWait=gEntries.filter(e=>!e.done).length;
-    const gd=document.createElement("details");gd.className="grade";
-    const gk="g:"+gname;gd.open=openKeys.has(gk)||!!q;
-    gd.ontoggle=()=>{gd.open?openKeys.add(gk):openKeys.delete(gk);};
-    const gs0=document.createElement("summary");
-    const gl=document.createElement("div");gl.textContent=gname;
-    const gr=badges(gStu,gWait);
-    gs0.appendChild(gl);gs0.appendChild(gr);gd.appendChild(gs0);
-    used.forEach(s=>{
-      const entries=inSec(s);
-      const gs=[...new Set(entries.map(e=>e._g))].sort((a,b)=>a.name.localeCompare(b.name));
-      const waiting=entries.filter(e=>!e.done).length;
-      const d=document.createElement("details");d.className="sec";
-      const sk="s:"+s;d.open=openKeys.has(sk)||!!q;
-      d.ontoggle=()=>{d.open?openKeys.add(sk):openKeys.delete(sk);};
-      const sm=document.createElement("summary");
-      const l=document.createElement("div");l.textContent=s;
-      const r=badges(gs.length,waiting);
-      sm.appendChild(l);sm.appendChild(r);d.appendChild(sm);
-      gs.forEach(g=>{
-        const mine=entries.filter(e=>e._g===g);
-        const row=document.createElement("div");row.className="stu";
-        const top=document.createElement("div");top.className="hh";
-        top.appendChild(line("nm",g.name));
-        const t=line("nm",mine.length+(mine.length===1?" time":" times"));
-        if(mine.length>1)t.classList.add("rep");
-        top.appendChild(t);row.appendChild(top);
-        const ul=document.createElement("ul");ul.className="log";
-        mine.slice().reverse().forEach(e=>{
-          const li=document.createElement("li");
-          li.textContent=[when(e.ts),e.reason||"",e.done?"QR made":"waiting"].filter(Boolean).join(" · ");
-          ul.appendChild(li);
-        });
-        row.appendChild(ul);d.appendChild(row);
-      });
-      gd.appendChild(d);
-    });
-    box.appendChild(gd);
+  const byGrade=new Map();
+  P.filter(vis).forEach(e=>{
+    const s=canon(e.section),g=gradeOf(s);
+    if(!byGrade.has(g))byGrade.set(g,new Map());
+    const m=byGrade.get(g);if(!m.has(s))m.set(s,[]);m.get(s).push(e);
   });
-  $("secEmpty").textContent=all.length?"No matches.":"No requests yet.";
+  if(secLevel==="roster"&&!(byGrade.get(secGrade)&&byGrade.get(secGrade).has(secSec)))secLevel="sections";
+  if(secLevel==="sections"&&!byGrade.get(secGrade))secLevel="grades";
+  const stuN=es=>new Set(es.map(e=>e._g)).size;
+
+  if(secLevel==="grades"){
+    const grid=document.createElement("div");grid.className="folders";
+    GRADES.map(g=>g[0]).concat(OTHER).filter(g=>byGrade.has(g)).forEach(g=>{
+      const m=byGrade.get(g),es=[].concat(...m.values());
+      const c=document.createElement("button");c.type="button";c.className="folder";
+      c.appendChild(icon(ICON_GRADE));
+      c.appendChild(line("f-name",g));
+      c.appendChild(line("f-meta",plural(m.size,"section")+" · "+plural(stuN(es),"student")));
+      c.appendChild(pills(es));
+      c.onclick=()=>secGo("sections",g);
+      grid.appendChild(c);
+    });
+    box.appendChild(grid);
+  }else if(secLevel==="sections"){
+    const m=byGrade.get(secGrade);
+    box.appendChild(crumb("All grade levels",()=>secGo("grades"),secGrade,plural(m.size,"section")));
+    const list=document.createElement("div");list.className="srows";
+    [...m.keys()].sort(secCmp).forEach(s=>{
+      const es=m.get(s);
+      const r=document.createElement("button");r.type="button";r.className="srow";
+      r.appendChild(icon(ICON_SEC));
+      const bd=document.createElement("span");bd.className="srow-body";
+      bd.appendChild(line("f-name",s));bd.appendChild(line("f-meta",plural(stuN(es),"student")));
+      r.appendChild(bd);r.appendChild(pills(es));
+      r.onclick=()=>secGo("roster",secGrade,s);
+      list.appendChild(r);
+    });
+    box.appendChild(list);
+  }else{
+    const es=byGrade.get(secGrade).get(secSec);
+    const gs=[...new Set(es.map(e=>e._g))].sort((a,b)=>a.name.localeCompare(b.name));
+    box.appendChild(crumb(secGrade,()=>secGo("sections",secGrade),secSec,plural(gs.length,"student")));
+    gs.forEach(g=>{
+      const mine=es.filter(e=>e._g===g).sort((a,b)=>(b.ts||0)-(a.ts||0));
+      const card=document.createElement("div");card.className="stu";
+      const top=document.createElement("div");top.className="stu-top";
+      const av=document.createElement("span");av.className="avatar";av.textContent=initials(g.name);
+      const bd=document.createElement("div");bd.className="stu-body";
+      bd.appendChild(line("nm",g.name));
+      bd.appendChild(line("meta",[mine[0].reason,when(mine[0].ts)].filter(Boolean).join(" · ")));
+      top.appendChild(av);top.appendChild(bd);
+      const t=pill(mine.length+(mine.length===1?" time":" times"),mine.length>1?"rep":"");
+      top.appendChild(t);card.appendChild(top);
+      const ul=document.createElement("ul");ul.className="stu-log";
+      mine.forEach(e=>{
+        const li=document.createElement("li");
+        li.appendChild(Object.assign(document.createElement("span"),{textContent:[when(e.ts),e.reason||"",e.done?"QR made":"waiting",e.exempt?"Exempt":""].filter(Boolean).join(" · ")}));
+        const ex=document.createElement("button");ex.type="button";ex.className="mini";ex.textContent=e.exempt?"Undo exempt":"Exempt";
+        ex.onclick=()=>toggleExempt(e,ex);
+        const mv=batchSelect(String(e._b),false);mv.className="mini-sel";mv.title="Move to batch";mv.setAttribute("aria-label","Batch");
+        mv.onchange=()=>moveBatch(e,mv.value);
+        const act=document.createElement("span");act.className="li-acts";act.appendChild(mv);act.appendChild(ex);
+        li.appendChild(act);ul.appendChild(li);
+      });
+      card.appendChild(ul);box.appendChild(card);
+    });
+  }
+  $("secEmpty").textContent=emptyMsg();
   $("secEmpty").classList.toggle("hide",box.children.length>0);
 }
 
 function copyWaiting(){
   cluster();
   const seen=new Set();
-  const list=all.filter(e=>{if(e.done||seen.has(e._g))return false;seen.add(e._g);return true;});
+  const list=P.filter(e=>{if(e.done||seen.has(e._g))return false;seen.add(e._g);return true;});
   if(!list.length)return say("aMsg","Nothing waiting.","bad");
   const text=["Name of student\tSection\tReason"].concat(list.map(e=>[e._g.name,canon(e.section),e.reason||""].join("\t"))).join("\n");
   const ok=()=>say("aMsg","Copied "+list.length+".","ok");
