@@ -46,7 +46,7 @@ function ibtn(svg,label,fn){const b=el("button","icon-btn",null,svg);b.type="but
 const pill=(t,c)=>el("span","pill"+(c?" pill--"+c:""),t);
 
 /* state */
-let batchesLoaded=false,readyView=false,readyDocs=[],readyLoaded=false,readyUnsub=null,readyBox=null,readyQ="",sheetFull=false,sheets=[],sheetDraft=null,sheetN=null,sheetDirty=false,saveT=null,all=[],batches=[],bsel="latest",loaded=false,user=null,tab="todo",q="",sent=false,flashId=null;
+let readyNav={lvl:"grades"},readyB=null,batchesLoaded=false,readyView=false,readyDocs=[],readyLoaded=false,readyUnsub=null,readyBox=null,readyQ="",sheetFull=false,sheets=[],sheetDraft=null,sheetN=null,sheetDirty=false,saveT=null,all=[],batches=[],bsel="latest",loaded=false,user=null,tab="todo",q="",sent=false,flashId=null;
 let sv={lvl:"grades",g:null,s:null,st:null},unsub=null,unsubB=null,searchOpen=false,toastT=null;
 /* toast */
 function say(t,kind){const box=document.getElementById("toastBox");box.textContent="";if(!t)return;const d=el("div","toast"+(kind==="bad"?" toast--bad":""),t);
@@ -157,7 +157,7 @@ function requestCard(e){const card=el("div","card"+(e.done?" card--done":"")+(e.
 function hero(P){const lost=P.length,ex=P.filter(e=>e.exempt).length,h=el("section","hero");h.setAttribute("aria-label","Summary");
   h.appendChild(el("div","hero__label","Revenue · "+bLabel()));h.appendChild(el("div","hero__num","₱"+((lost-ex)*PRICE).toLocaleString()));
   const s=el("div","hero__sub");const a=el("span",null,"Lost QR ");a.appendChild(el("b",null,lost));const b=el("span",null,"Exempt ");b.appendChild(el("b",null,ex));s.append(a,b,el("span",null,"₱"+PRICE+" each"));h.appendChild(s);return h;}
-function searchBox(){const w=el("div","search");w.appendChild(el("span","ico",null,IC.search));const i=el("input");i.type="text";i.id="q";i.autocomplete="off";i.placeholder="Search name, section or reason";i.setAttribute("aria-label","Search");i.value=q;
+function searchBox(){const w=el("div","search");w.appendChild(el("span","search__icon",null,IC.search));const i=el("input");i.type="text";i.id="q";i.autocomplete="off";i.placeholder="Search name, section or reason";i.setAttribute("aria-label","Search");i.value=q;
   i.oninput=()=>{q=clean(i.value).toLowerCase();const p=i.selectionStart;render();const n=document.getElementById("q");n.focus();n.setSelectionRange(p,p);};w.appendChild(i);
   if(q)w.appendChild(ibtn(IC.x,"Clear search",()=>{q="";render();}));return w;}
 function renderTodo(box,P){
@@ -287,22 +287,40 @@ function reconcile(){if(!user||!loaded||!readyLoaded||!batchesLoaded)return;all.
   want.forEach((e,id)=>{const r=have.get(id),section=canon(e.section);if(!r||r.name!==e.name||r.section!==section||r.batch!==e._b)setDoc(doc(db,"ready",id),{name:e.name,section,batch:e._b}).catch(()=>{});});}
 function fillReady(){if(!readyBox)return;readyBox.textContent="";
   if(!readyLoaded){for(let i=0;i<3;i++)readyBox.appendChild(el("div","skel"));return;}
-  const list=readyDocs.filter(r=>!readyQ||(r.name+" "+r.section).toLowerCase().includes(readyQ));
-  if(!list.length){readyBox.appendChild(empty(readyQ?"Walay nakita.":"Wala pa."));return;}
-  const byB=new Map();list.forEach(r=>{const b=Number.isFinite(r.batch)?r.batch:1;if(!byB.has(b))byB.set(b,[]);byB.get(b).push(r);});
-  [...byB.keys()].sort((a,b)=>b-a).forEach(b=>{
-    const rs=byB.get(b),h=el("div","sec-head");h.appendChild(el("h2",null,"Batch "+b));h.appendChild(el("span","muted",plural(rs.length,"student")));readyBox.appendChild(h);
-    const byG=new Map();rs.forEach(r=>{const g=gradeOf(canon(r.section));if(!byG.has(g))byG.set(g,[]);byG.get(g).push(r);});
-    GRADES.map(g=>g[0]).concat("Other").filter(g=>byG.has(g)).forEach(g=>{
-      readyBox.appendChild(el("div","subhead",g+" · "+byG.get(g).length));
-      const st=el("div","stack");byG.get(g).sort((a,b)=>(ALLSEC.indexOf(canon(a.section))-ALLSEC.indexOf(canon(b.section)))||a.name.localeCompare(b.name)).forEach(r=>{
-        const c=el("div","card"),bd=el("div","card__body");bd.appendChild(el("div","card__title wrap",r.name));bd.appendChild(el("div","card__meta",r.section));c.appendChild(bd);c.appendChild(pill("Ready","outline"));st.appendChild(c);});
-      readyBox.appendChild(st);});});}
-function renderReady(root){ensureReady();readyQ="";const page=el("div","page public stack");
+  const bOf=r=>Number.isFinite(r.batch)?r.batch:1;
+  const nums=[...new Set(readyDocs.map(bOf))].sort((a,b)=>b-a);
+  if(readyB===null||(readyB!=="all"&&!nums.includes(readyB)))readyB=nums.length?nums[0]:"all";
+  if(nums.length>1){const row=el("div","chips");
+    nums.concat("all").forEach(n=>{const b=el("button","pillbtn",n==="all"?"All":"Batch "+n);b.type="button";b.setAttribute("aria-pressed",String(readyB===n));
+      b.onclick=()=>{readyB=n;readyNav={lvl:"grades"};fillReady();};row.appendChild(b);});readyBox.appendChild(row);}
+  const docs=readyDocs.filter(r=>readyB==="all"||bOf(r)===readyB);
+  const sortR=(a,b)=>(ALLSEC.indexOf(canon(a.section))-ALLSEC.indexOf(canon(b.section)))||a.name.localeCompare(b.name);
+  const rCard=(r,showSec)=>{const c=el("div","card"),bd=el("div","card__body");bd.appendChild(el("div","card__title wrap",r.name));
+    bd.appendChild(el("div","card__meta",(showSec?r.section+" · ":"")+(readyB==="all"?"Batch "+bOf(r):"Ready")));c.appendChild(bd);c.appendChild(pill("Ready","outline"));return c;};
+  const list=el("div","stack");
+  if(readyQ){const hits=docs.filter(r=>(r.name+" "+r.section).toLowerCase().includes(readyQ)).sort(sortR);
+    if(!hits.length){readyBox.appendChild(empty("Walay nakita."));return;}
+    hits.forEach(r=>list.appendChild(rCard(r,true)));readyBox.appendChild(list);return;}
+  if(!docs.length){readyBox.appendChild(empty("Wala pa."));return;}
+  const byG=new Map();docs.forEach(r=>{const s=canon(r.section),g=gradeOf(s);if(!byG.has(g))byG.set(g,new Map());const m=byG.get(g);if(!m.has(s))m.set(s,[]);m.get(s).push(r);});
+  const go=o=>()=>{readyNav=o;fillReady();window.scrollTo(0,0);};
+  if(readyNav.lvl==="sections"&&!byG.get(readyNav.g))readyNav={lvl:"grades"};
+  if(readyNav.lvl==="students"&&!(byG.get(readyNav.g)&&byG.get(readyNav.g).has(readyNav.s)))readyNav={lvl:"grades"};
+  if(readyNav.lvl==="grades"){const grid=el("div","folders");
+    GRADES.map(g=>g[0]).concat("Other").filter(g=>byG.has(g)).forEach(g=>{const n=[].concat(...byG.get(g).values()).length;
+      const t=el("button","tile");t.type="button";t.appendChild(el("span","ico",null,IC.grade));t.appendChild(el("div","card__title",g));t.appendChild(pill(plural(n,"ready"),"strong"));t.onclick=go({lvl:"sections",g});grid.appendChild(t);});
+    readyBox.appendChild(grid);}
+  else if(readyNav.lvl==="sections"){readyBox.appendChild(crumbs([{t:"Grade levels",fn:go({lvl:"grades"})},{t:readyNav.g}]));
+    const m=byG.get(readyNav.g);[...m.keys()].sort((a,b)=>ALLSEC.indexOf(a)-ALLSEC.indexOf(b)).forEach(s=>{
+      const r=el("button","row");r.type="button";r.appendChild(el("span","ico",null,IC.people));const b=el("span","row__body");b.appendChild(el("div","card__title",s));b.appendChild(el("div","card__meta",plural(m.get(s).length,"student")));
+      r.appendChild(b);r.insertAdjacentHTML("beforeend",IC.chev);r.onclick=go({lvl:"students",g:readyNav.g,s});readyBox.appendChild(r);});}
+  else{readyBox.appendChild(crumbs([{t:"Grade levels",fn:go({lvl:"grades"})},{t:readyNav.g,fn:go({lvl:"sections",g:readyNav.g})},{t:readyNav.s}]));
+    byG.get(readyNav.g).get(readyNav.s).sort(sortR).forEach(r=>list.appendChild(rCard(r,false)));readyBox.appendChild(list);}}
+function renderReady(root){ensureReady();readyQ="";readyNav={lvl:"grades"};readyB=null;const page=el("div","page public stack");
   const logo=el("img","logo");logo.alt="ASTIG";logo.src=LOGO;page.appendChild(logo);
   page.appendChild(btn("← Balik","btn--text",()=>{readyView=false;render();}));
   page.appendChild(el("h1",null,"Pwede na makuha"));page.appendChild(el("p","muted","Kuhaa sa SSLG office ang inyong QR."));
-  const w=el("div","search");w.appendChild(el("span","ico",null,IC.search));const i=el("input");i.type="text";i.autocomplete="off";i.placeholder="Search name";i.setAttribute("aria-label","Search name");
+  const w=el("div","search");w.appendChild(el("span","search__icon",null,IC.search));const i=el("input");i.type="text";i.autocomplete="off";i.placeholder="Search name";i.setAttribute("aria-label","Search name");
   i.oninput=()=>{readyQ=clean(i.value).toLowerCase();fillReady();};w.appendChild(i);page.appendChild(w);
   readyBox=el("div");page.appendChild(readyBox);fillReady();root.appendChild(page);}
 
