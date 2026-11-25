@@ -5,12 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Lost QR</title>
 <link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a2855">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lost QR">
+<link rel="apple-touch-icon" href="astig.png">
 </head>
 <body>
 <div id="app"></div><div id="layer"></div><div id="toastBox" role="status" aria-live="polite"></div>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getFirestore,collection,addDoc,onSnapshot,doc,updateDoc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {initializeFirestore,persistentLocalCache,persistentMultipleTabManager,collection,addDoc,setDoc,onSnapshot,doc,updateDoc,deleteDoc} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getAuth,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 /* ===== App ===== */
@@ -21,7 +27,7 @@ const app=initializeApp({
   storageBucket:"astig-qr.firebasestorage.app",
   messagingSenderId:"671736982428",
   appId:"1:671736982428:web:b7f8ec12bb51c5044af659"
-}),db=getFirestore(app),auth=getAuth(app),COL="requests",PRICE=20;
+}),db=initializeFirestore(app,{localCache:persistentLocalCache({tabManager:persistentMultipleTabManager()})}),auth=getAuth(app),COL="requests",PRICE=20;
 const L=(g,arr)=>arr.map(x=>g+"-"+x);
 const GRADES=[["Grade 7",L(7,"ABCDEF".split(""))],["Grade 8",L(8,"ABCDEF".split(""))],["Grade 9",L(9,"ABCDE".split(""))],["Grade 10",L(10,"ABCDE".split(""))],["Grade 11",L(11,["Amaranth","Burgundy","Cerulean","Driftwood","Ebony","Fuchsia","Garnet","Honeydew"])],["Grade 12",L(12,["Amethyst","Bloodstone","Emerald","Epidote","Euclase","Fedorite","Obsidian","Sapphire"])]];
 const ALLSEC=GRADES.flatMap(g=>g[1]);
@@ -209,6 +215,7 @@ function renderAdmin(root){
   const page=el("div","page stack"+wide);
   const bar=el("header","appbar");bar.appendChild(el("img","logo logo--sm"));bar.firstChild.alt="ASTIG";bar.firstChild.src=LOGO;
   bar.appendChild(el("h1",null,tab==="todo"?"Requests":tab==="sheet"?"Sheet":"Students"));
+  if(!navigator.onLine)bar.appendChild(pill("Offline · will sync","strong"));
   bar.appendChild(ibtn(IC.search,"Search",()=>{searchOpen=!searchOpen;render();if(searchOpen){const i=document.getElementById("q");i&&i.focus();}}));
   bar.appendChild(ibtn(IC.dots,"More actions",moreMenu));page.appendChild(bar);
   const main=el("main","stack");
@@ -231,7 +238,10 @@ function saveSheet(manual){clearTimeout(saveT);const n=sheetN,d=sheets.find(x=>x
   const p=d?updateDoc(doc(db,"sheets",d._id),{rows}):addDoc(collection(db,"sheets"),{n,rows});
   return p.then(()=>{sheetDirty=false;const s=document.getElementById("saveState");if(s)s.textContent="Saved ✓ "+new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});if(manual)say("Saved.");})
    .catch(()=>{const s=document.getElementById("saveState");if(s)s.textContent="Not saved. Check your connection.";say("Couldn’t save the sheet.","bad");});}
-function touchSheet(){sheetDirty=true;const s=document.getElementById("saveState");if(s)s.textContent="Saving…";clearTimeout(saveT);saveT=setTimeout(()=>saveSheet(false),1200);}
+/* counts rows that have anything typed in them */
+function sheetCount(){return sheetDraft.filter(r=>r.some(c=>clean(c))).length;}
+function updateCount(){const x=document.getElementById("sheetCount");if(x)x.textContent=plural(sheetCount(),"student");}
+function touchSheet(){updateCount();sheetDirty=true;const s=document.getElementById("saveState");if(s)s.textContent="Saving…";clearTimeout(saveT);saveT=setTimeout(()=>saveSheet(false),1200);}
 function copySheet(){const rows=sheetDraft.filter(r=>r.some(c=>clean(c)));if(!rows.length)return say("Nothing to copy yet.","bad");
   const text=[COLS].concat(rows).map(r=>r.join("\t")).join("\n");const ok=()=>say("Copied "+rows.length+" rows. Paste into Excel.");
   const fb=()=>{const t=el("textarea");t.value=text;document.body.appendChild(t);t.select();let r=false;try{r=document.execCommand("copy");}catch(x){}document.body.removeChild(t);r?ok():say("Copy failed. Try again.","bad");};
@@ -240,7 +250,7 @@ function renderSheet(box){const n=selN()==="all"?curN():selN();if(sheetN!==n){sh
   if(!sheetFull)box.appendChild(el("p","muted","Batch "+n+" sheet. It saves by itself. You can paste straight from Excel."));
   const bar=el("div","sheetbar");if(sheetFull)bar.appendChild(btn("Exit full screen","btn--secondary",()=>{sheetFull=false;render();}));bar.appendChild(btn("Copy all","",copySheet));bar.appendChild(btn("Save","btn--secondary",()=>saveSheet(true)));
   if(!sheetFull)bar.appendChild(btn("Full screen","btn--secondary",()=>{sheetFull=true;render();}));bar.appendChild(btn("Add 10 rows","btn--text",()=>{for(let i=0;i<10;i++)sheetDraft.push(Array(COLS.length).fill(""));touchSheet();render();}));
-  const st=el("div","savestate",sheetFull?"Batch "+n:"");st.id="saveState";bar.appendChild(st);box.appendChild(bar);
+  const st=el("div","savestate",sheetFull?"Batch "+n:"");st.id="saveState";const cnt=pill(plural(sheetCount(),"student"),"strong");cnt.id="sheetCount";bar.appendChild(cnt);bar.appendChild(st);box.appendChild(bar);
   const wrap=el("div","gridwrap");wrap.tabIndex=0;wrap.setAttribute("role","region");wrap.setAttribute("aria-label","Batch "+n+" spreadsheet");
   const t=el("table","grid"),hr=el("tr");hr.appendChild(el("th","rn",""));COLS.forEach(c=>{const th=el("th",null,c);th.scope="col";hr.appendChild(th);});t.appendChild(el("thead")).appendChild(hr);
   const tb=el("tbody");sheetDraft.forEach((row,ri)=>{const tr=el("tr");tr.appendChild(el("td","rn",ri+1));
@@ -253,9 +263,23 @@ function renderSheet(box){const n=selN()==="all"?curN():selN();if(sheetN!==n){sh
     td.appendChild(i);tr.appendChild(td);});tb.appendChild(tr);});
   t.appendChild(tb);wrap.appendChild(t);box.appendChild(wrap);}
 
+/* ---------- offline outbox: student requests are saved on this device first, then sent when there is internet ---------- */
+const OUT="lostqr-outbox";
+const qGet=()=>{try{return JSON.parse(localStorage.getItem(OUT)||"[]");}catch(e){return [];}};
+const qSet=a=>{try{localStorage.setItem(OUT,JSON.stringify(a));}catch(e){}};
+let flushing=false;
+function updateNote(){const n=qGet().length,x=document.getElementById("outNote");if(x)x.textContent=n?"Saved on this device. "+plural(n,"request")+" will send when there is internet.":"";}
+async function flushOutbox(){if(flushing||!navigator.onLine)return;flushing=true;
+  try{for(const it of qGet()){
+    try{await Promise.race([setDoc(doc(db,COL,it.id),{name:it.name,section:it.section,reason:it.reason,ts:it.ts,done:false}),new Promise((_,no)=>setTimeout(()=>no({code:"timeout"}),15000))]);
+      qSet(qGet().filter(x=>x.id!==it.id));}
+    catch(e){if(e&&e.code==="permission-denied")qSet(qGet().filter(x=>x.id!==it.id));else break;}}}
+  finally{flushing=false;updateNote();}}
+setInterval(flushOutbox,30000);
+
 /* ---------- public form + sign in ---------- */
 function renderPublic(root){const page=el("div","page public");const logo=el("img","logo");logo.alt="ASTIG";logo.src=LOGO;if(!sent)page.appendChild(logo);
-  if(sent){page.appendChild(logo);const p=el("p","final","Kuhaa ra sa SSLG office, ");p.appendChild(el("strong",null,"AYAW NA WAD-A PLEASE"));page.appendChild(p);page.appendChild(btn("Send another","btn--secondary btn--full",()=>{sent=false;render();}));root.appendChild(page);return;}
+  if(sent){page.appendChild(logo);const p=el("p","final","Kuhaa ra sa SSLG office, ");p.appendChild(el("strong",null,"AYAW NA WAD-A PLEASE"));page.appendChild(p);const note=el("p","muted outnote");note.id="outNote";page.appendChild(note);updateNote();page.appendChild(btn("Send another","btn--secondary btn--full",()=>{sent=false;render();}));root.appendChild(page);return;}
   const box=el("div","card-box");box.appendChild(el("h1",null,"Lost QR"));
   const f=(lab,inp)=>{const l=el("label","field",lab);l.appendChild(inp);box.appendChild(l);return inp;};
   const nm=el("input");nm.type="text";nm.maxLength=100;nm.placeholder="Jesse Harris Almacin";f("Name of student",nm);
@@ -264,7 +288,7 @@ function renderPublic(root){const page=el("div","page public");const logo=el("im
   const rs=el("input");rs.type="text";rs.maxLength=100;rs.placeholder="Lost ID";f("Why was it lost?",rs);
   const msg=el("div","msg");msg.setAttribute("role","status");msg.setAttribute("aria-live","polite");
   const send=btn("Send","btn--full",async()=>{const name=clean(nm.value),reason=clean(rs.value);msg.textContent=!name?"Enter the name of the student.":!g.value?"Select the grade level.":!s.value?"Select the section.":!reason?"Enter why it was lost.":"";if(msg.textContent)return;
-   send.disabled=true;await addDoc(collection(db,COL),{name,section:s.value,reason,ts:Date.now(),done:false});sent=true;render();});
+   send.disabled=true;qSet(qGet().concat({id:"r"+Date.now().toString(36)+Math.random().toString(36).slice(2,8),name,section:s.value,reason,ts:Date.now()}));sent=true;render();flushOutbox();});
   send.classList.add("btn--send");box.appendChild(el("div","sec-head")).remove();box.appendChild(send);box.appendChild(msg);page.appendChild(box);root.appendChild(page);}
 function renderLogin(root){const page=el("div","page public");const logo=el("img","logo");logo.alt="ASTIG";logo.src=LOGO;page.appendChild(logo);const box=el("div","card-box");box.appendChild(el("h1",null,"Admin sign in"));
   const f=(lab,t)=>{const l=el("label","field",lab);const i=el("input");i.type=t;l.appendChild(i);box.appendChild(l);return i;};const em=f("Email","email"),pw=f("Password","password");em.autocomplete="username";pw.autocomplete="current-password";
@@ -282,10 +306,13 @@ function render(){const ae=document.activeElement;if(loaded&&ae&&ae.closest&&ae.
   if(location.hash!=="#list")return renderPublic(root);
   if(!user)return renderLogin(root);startList();renderAdmin(root);}
 document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&sheetFull&&!document.querySelector(".sheet")){sheetFull=false;render();}});
+window.addEventListener("online",()=>{flushOutbox();if(location.hash==="#list")say("Back online. Syncing…");render();});
+window.addEventListener("offline",()=>{say("Offline. Your changes are saved on this phone and will sync later.");render();});
 window.addEventListener("hashchange",render);
 onAuthStateChanged(auth,u=>{user=u;if(!u){unsub=unsubB=null;all=[];batches=[];loaded=false;}render();});
 const LOGO="astig.png";
-render();
+render();flushOutbox();
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 </script>
 </body>
 </html>
